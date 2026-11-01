@@ -1,5 +1,7 @@
 # Roney Weather
 
+**Live at https://roney-weather.vercel.app** (Vercel deploys `main`).
+
 A personal weather app: one hand-written `index.html`, zero dependencies, no
 build step. Save the places you care about (search a city, or use the phone's
 location), see current conditions, the next 24 hours, and the week ahead; flip

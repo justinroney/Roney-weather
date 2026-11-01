@@ -16,7 +16,8 @@ node tests/smoke.mjs        # ~50 checks, Open-Meteo mocked, ~6s
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
 
-**Deploying is pushing `main`** (Vercel auto-deploys). Every release bumps
+**Deploying is pushing `main`** (Vercel auto-deploys to
+https://roney-weather.vercel.app in ~30s). Every release bumps
 `APP_VERSION` in index.html **and** `CACHE` in sw.js to the same `wNN` — the
 suite fails if they differ. Never open a PR unless asked.
 
