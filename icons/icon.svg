@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Roney Weather icon — source of truth for the PNGs beside it. Same near-black
+     ground as the routine icon; sun and cloud in the app's own tokens. Re-render
+     with headless Chromium at 512/192/180 (see HANDOVER.md). -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" fill="#0E1417"/>
+  <g stroke="#FFC65C" stroke-width="22" stroke-linecap="round">
+    <line x1="440.0" y1="196.0" x2="468.0" y2="196.0"/>
+    <line x1="404.3" y1="282.3" x2="424.1" y2="302.1"/>
+    <line x1="318.0" y1="318.0" x2="318.0" y2="346.0"/>
+    <line x1="231.7" y1="282.3" x2="211.9" y2="302.1"/>
+    <line x1="196.0" y1="196.0" x2="168.0" y2="196.0"/>
+    <line x1="231.7" y1="109.7" x2="211.9" y2="89.9"/>
+    <line x1="318.0" y1="74.0" x2="318.0" y2="46.0"/>
+    <line x1="404.3" y1="109.7" x2="424.1" y2="89.9"/>
+  </g>
+  <circle cx="318" cy="196" r="88" fill="#FFC65C"/>
+  <g fill="#9FB3D0">
+    <circle cx="170" cy="332" r="68"/>
+    <circle cx="246" cy="288" r="92"/>
+    <circle cx="330" cy="332" r="74"/>
+    <rect x="170" y="330" width="160" height="76"/>
+    <rect x="102" y="332" width="302" height="74" rx="37"/>
+  </g>
+</svg>

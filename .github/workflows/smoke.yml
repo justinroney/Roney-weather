@@ -1,0 +1,22 @@
+# Every push gets booted in a real browser with the weather service mocked,
+# so a broken edit never reaches the phone.
+name: smoke
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright (not a repo dependency — the app stays build-free)
+        run: |
+          npm install --no-save --no-package-lock playwright@1.49.1
+          npx playwright install --with-deps chromium
+      - name: Smoke suite
+        run: node tests/smoke.mjs
