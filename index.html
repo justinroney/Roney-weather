@@ -215,17 +215,18 @@ svg{display:block}
 .roofbest b{color:var(--good)}
 .roofneed .grp{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
 .roofneed .calc{width:100%;color:var(--faint);font-size:var(--fs-micro);margin-top:2px}
-.wd{display:grid;grid-template-columns:44px 58px 1fr auto;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:var(--fs-label)}
+.wd{display:grid;grid-template-columns:42px 46px 1fr 74px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:var(--fs-label);width:100%;text-align:left;background:none;border-left:none;border-right:none;border-top:none;font-family:inherit;color:inherit}
 .wd:last-child{border-bottom:none}
 .wd .n{font-weight:700}
-.wd .pill{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 7px;background:var(--tone);color:#06131B;text-align:center;min-width:52px}
+.wd .pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border-radius:999px;padding:3px 0;background:var(--tone);color:#06131B;text-align:center;width:46px}
 :root[data-theme="light"] .wd .pill,:root:not([data-theme="dark"]) .wd .pill{color:#fff}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .wd .pill{color:#06131B}}
 .wd .pill.go{--tone:var(--good)} .wd .pill.caution{--tone:var(--warn)} .wd .pill.nogo{--tone:var(--crit)} .wd .pill.wait{--tone:var(--dim)}
-.wd .w{line-height:1.35}
-.wd .w small{display:block;color:var(--dim);font-size:var(--fs-cap)}
-.wd .t{text-align:right;color:var(--dim);font-size:var(--fs-cap);line-height:1.35;white-space:nowrap}
-.wd .t b{color:var(--ink);display:block}
+.wd .w{line-height:1.35;min-width:0}
+.wd .w small{display:block;color:var(--dim);font-size:var(--fs-cap);line-height:1.35}
+.wd .t{text-align:right;color:var(--dim);font-size:var(--fs-cap);line-height:1.35;display:flex;flex-direction:column;align-items:flex-end;gap:1px}
+.wd .t b{color:var(--ink);white-space:nowrap}
+.wd .t span{white-space:nowrap}
 .seal{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--good)}
 .seal.hand{color:var(--warn)}
 
@@ -1097,7 +1098,7 @@ function roofOutlook(d, hi, need) {
     rows += `<div class="wd" data-day="${k}" role="button" tabindex="0">
       <span class="n">${esc(fmtDay(day, today))}</span><span class="pill ${verdict}">${verdict === "nogo" ? "no" : verdict === "go" ? "go" : "tight"}</span>
       <span class="w">${esc(text)}<small>${esc(sub)}</small></span>
-      <span class="t"><b>${deg(D.temperature_2m_max[k])} / ${deg(D.temperature_2m_min[k])}</b>gusts ${U.wind(gust).split(" ")[0]} · ${seal}</span>
+      <span class="t"><b>${deg(D.temperature_2m_max[k])} / ${deg(D.temperature_2m_min[k])}</b><span>gusts ${U.wind(gust).split(" ")[0]}</span>${seal}</span>
     </div>`;
   }
   return `<div class="sec-label">Workdays ahead <span class="aside">${need} h job</span></div><div class="card" id="roofWeek">${rows}</div>
