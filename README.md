@@ -6,7 +6,7 @@ A personal weather app: one hand-written `index.html`, zero dependencies, no
 build step. Installable as its own app from Chrome (⋮ → Install app) or
 Safari (Share → Add to Home Screen).
 
-What it does (w9):
+What it does (w10):
 
 - **Places** — search a city, or use the phone's location. Saved on the
   device; the last forecast per place is kept so the app answers with no signal.
@@ -24,11 +24,12 @@ What it does (w9):
   and ozone), pressure and its trend, visibility and cloud cover, sunrise and
   sunset, moon phase.
 - **Roofing window, built for the trade** — can the deck be opened now and
-  dried in before the weather closes it? Size the job in squares and crew
-  on the roof (1.5 squares per man-hour gives the hours to dry in); get a
+  dried in before the weather closes it? Size the job in squares, crew on
+  the roof and the crew's pace in squares per man-hour (all saved); get a
   GO / CAUTION / NO GO verdict with the reason ("Rain (HRRR) around 1 PM
-  leaves 4 dry hours; you need 5"), a 48-hour strip coloured by risk, and
-  the factors: rain, **timing** (the default blend against NOAA's HRRR
+  leaves 4 dry hours; you need 5"), a three-day timeline on one 5 AM–9 PM
+  clock with labelled blocks ("dry 4 h", "rain", "dew", "dark"), a now line
+  and your job drawn as a dashed box, and the factors: rain, **timing** (the default blend against NOAA's HRRR
   model, planning on whichever is earlier), **surface** (rain in the last
   24 hours, dew, a wet deck), **storms** (thunder, plus CAPE storm fuel),
   wind, temperature, daylight. Then **Workdays ahead**: seven days, each
@@ -74,7 +75,7 @@ hurricane tracks from the NHC feeds, storm reports, an hourly detail sheet.
 - `sw.js` — offline shell (network-first). `CACHE` must match `APP_VERSION`.
 - `manifest.json`, `icons/` — the install surface. `icons/icon.svg` is the
   source; the PNGs were rendered from it with headless Chromium.
-- `tests/smoke.mjs` — the suite (~161 checks, including every roofing
+- `tests/smoke.mjs` — the suite (~168 checks, including every roofing
   threshold against its published value). Open-Meteo, NWS, Rain Viewer
   and the map tiles are all mocked at the network layer.
 

@@ -254,8 +254,19 @@ await p.goto(BASE); await p.waitForTimeout(600);
 ok("roofing card present with a verdict", (await p.locator("#roof").count()) === 1 && (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "NOGO");
 ok("headline counts the dry hours against the job, on the earlier model", (await text(p, "#roofHead")) === "Not enough time. Rain (HRRR) around 1 PM leaves 4 dry hours; you need 5.", await text(p, "#roofHead"));
 ok("job maths shown", /5 h to dry in.*30 squares ÷ \(4 on the roof × 1\.5 sq per man-hour\)/.test(await text(p, "#roofCalc")), await text(p, "#roofCalc"));
-ok("48-hour strip, now outlined, red from 2 PM, grey at night", (await p.locator("#roofStrip i").count()) === 48 && (await p.locator("#roofStrip i.now").count()) === 1
-  && await p.locator("#roofStrip i:nth-child(5)").evaluate(e => e.classList.contains("r2")) && await p.locator("#roofStrip i:nth-child(12)").evaluate(e => e.classList.contains("r3")));
+ok("timeline: three day rows on one axis with a now line", (await p.locator("#roofTl .tlrow").count()) === 3 && (await p.locator("#roofTl .tlnow").count()) === 1 && /6 AM/.test(await text(p, "#roofTl .ax")) && /Noon/.test(await text(p, "#roofTl .ax")) && /now/.test(await text(p, "#roofTl .ax")),
+  (await p.locator("#roofTl .tlrow").count()) + " rows, " + (await p.locator("#roofTl .tlnow").count()) + " now, axis: " + (await text(p, "#roofTl .ax")).replace(/\s+/g, " "));
+ok("today's row: hatched past, dry 4 h, red from 1 PM, dark after sunset", await p.locator('#roofTl [data-day-row="0"]').evaluate(row => {
+  const segs = [...row.querySelectorAll(".seg")].map(e => [e.className.replace("seg ", ""), parseFloat(e.style.left), e.textContent]);
+  return segs[0][0] === "past" && segs[1][0] === "r0" && segs[1][2] === "dry 4 h" && segs[1][1] === 25 && segs[2][0] === "r2" && segs[2][1] === 50 && segs[segs.length - 1][0] === "r3" && segs[segs.length - 1][2] === "dark";
+}), await p.locator('#roofTl [data-day-row="0"]').evaluate(row => [...row.querySelectorAll(".seg")].map(e => e.className + "@" + e.style.left + ":" + e.textContent).join(" | ")));
+ok("the wide red block says rain, the one-hour HRRR block stays unlabelled", (await p.locator('#roofTl [data-day-row="0"] .seg.r2').nth(1).textContent()) === "rain" && (await p.locator('#roofTl [data-day-row="0"] .seg.r2').nth(0).textContent()) === "");
+ok("the job box starts now and spans the job's hours", (await p.locator("#roofJob").count()) === 1 && (await p.locator("#roofJob").evaluate(e => e.style.left + " " + e.style.width)) === "26.25% 31.25%", await p.locator("#roofJob").evaluate(e => e.style.left + " " + e.style.width));
+ok("tomorrow's row has no job box and starts dry at 8 AM", (await p.locator('#roofTl [data-day-row="1"] .tljob').count()) === 0 && await p.locator('#roofTl [data-day-row="1"] .seg.r0').first().evaluate(e => e.style.left === "18.75%"));
+ok("past blocks aren't tappable, live ones are", (await p.locator('#roofTl .seg.past[data-hour]').count()) === 0 && (await p.locator('#roofTl .seg.r0[data-hour]').count()) >= 3);
+await p.click('#roofTl [data-day-row="0"] .seg.r2'); await p.waitForTimeout(300);
+ok("tapping a block opens that hour", (await text(p, "#infoT")) === "1 PM · Today" && /stop · rain \(HRRR\)/.test(await text(p, "#infoB")), await text(p, "#infoT"));
+await p.click("#infoDone"); await p.waitForTimeout(200);
 ok("factor rows: rain, timing, surface, storms, wind, temp, daylight", (await p.locator(".rf").count()) === 7 && /rain \(HRRR\) from 1 PM \(4 h away\)/.test(await text(p, ".rooffacts")) && /above the 40° shingle minimum/.test(await text(p, ".rooffacts")) && /of light left/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
 ok("timing row compares the two models", /blend says 2 PM, HRRR says 1 PM · planning on the earlier/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
 ok("surface row knows yesterday's rain", /0\.2 in fell in the last 24 h/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
@@ -291,7 +302,9 @@ await p.click('[data-crew="6"]'); await p.waitForTimeout(300);
 ok("6 on the roof → 4 h job → caution with no margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /Tight\. 4 dry hours until rain \(HRRR\) around 1 PM, you need 4; no margin\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
 await p.click('[data-sq="15"]'); await p.waitForTimeout(300);
 ok("15 squares with 6 → 2 h job → go with 2 h margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "GO" && /Good to go\. 4 dry hours until rain \(HRRR\) around 1 PM, 2 more than you need\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
-ok("settings persist", (st => st.roofSquares === 15 && st.roofCrew === 6)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
+await p.click('[data-rate="1"]'); await p.waitForTimeout(300);
+ok("pace 1 sq/h with 6 → 3 h job → caution", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /you need 3; 1 hour of margin/.test(await text(p, "#roofHead")) && /× 1 sq per man-hour/.test(await text(p, "#roofCalc")), await text(p, "#roofHead"));
+ok("settings persist", (st => st.roofSquares === 15 && st.roofCrew === 6 && st.roofRate === 1)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
 await p.click("#roofWeek .wd:nth-child(3)"); await p.waitForTimeout(300);
 ok("tapping a workday opens the day explainer with the roofing read", /Tuesday/.test(await text(p, "#infoT")) && /Longest safe window/.test(await text(p, "#infoB")) && /8 AM to 2 PM · 6 h/.test(await text(p, "#infoB")), await text(p, "#infoB"));
 await p.click("#infoDone"); await p.waitForTimeout(200);
@@ -300,7 +313,7 @@ ok("roofing explainer lists the rules with their sources", (await text(p, "#info
 ok("explainer says what it's built for", /which days can I book a tear-off/.test(await text(p, "#infoB")) && /HRRR/.test(await text(p, "#infoB")));
 ok("fourteen source links, all external and new-tab", (await p.locator("#infoB .src a").count()) === 14 && await p.locator("#infoB .src a").evaluateAll(as => as.every(a => /^https:\/\//.test(a.href) && a.target === "_blank" && /noopener/.test(a.rel))));
 await p.click("#infoDone"); await p.waitForTimeout(200);
-await p.click('[data-sq="30"]'); await p.click('[data-crew="4"]'); await p.waitForTimeout(200);
+await p.click('[data-sq="30"]'); await p.click('[data-crew="4"]'); await p.click('[data-rate="1.5"]'); await p.waitForTimeout(200);
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 if (process.env.SHOT) await p.locator("#roof").screenshot({ path: path.join(process.env.SHOT, "weather-roof.png") });
 if (process.env.SHOT) await p.locator("#roofWeek").screenshot({ path: path.join(process.env.SHOT, "weather-week.png") });
