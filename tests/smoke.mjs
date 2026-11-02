@@ -253,7 +253,15 @@ p = await page({ state: bare, noMinutely: true });
 await p.goto(BASE); await p.waitForTimeout(600);
 ok("roofing card present with a verdict", (await p.locator("#roof").count()) === 1 && (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "NOGO");
 ok("headline counts the dry hours against the job, on the earlier model", (await text(p, "#roofHead")) === "Not enough time. Rain (HRRR) around 1 PM leaves 4 dry hours; you need 5.", await text(p, "#roofHead"));
-ok("job maths shown", /5 h to dry in.*30 squares ÷ \(4 on the roof × 1\.5 sq per man-hour\)/.test(await text(p, "#roofCalc")), await text(p, "#roofCalc"));
+ok("job maths shown, with the day's capacity", /5 h to dry in.*30 squares ÷ \(4 on the roof × 1\.5 sq per man-hour\)/.test(await text(p, "#roofCalc")) && /A full 8 h day holds about 48 sq for this crew \(1½ roofs of 30 sq\); a caution day about half that/.test(await text(p, "#roofCalc")), await text(p, "#roofCalc"));
+ok("workday rows carry the crew's capacity", /4 men ≈ 24 sq, under a roof/.test(await text(p, "#roofWeek .wd:nth-child(1) .w")) && /4 men ≈ 36 sq, 1 roof/.test(await text(p, "#roofWeek .wd:nth-child(3) .w")), await text(p, "#roofWeek .wd:nth-child(3) .w"));
+/* a commercial crew: 4 roofs of 42 with 32 men at a measured 0.55 */
+await p.fill('[data-num="roofCrew"]', "32"); await p.locator('[data-num="roofCrew"]').dispatchEvent("change"); await p.waitForTimeout(250);
+await p.click('[data-bsq="42"]'); await p.click('[data-bld="4"]'); await p.click('[data-rate="0.5"]'); await p.waitForTimeout(300);
+ok("4 × 42 sq with 32 men at 0.5 → 11 h; a full day holds 128 sq, 3 roofs", /11 h to dry in.*4 × 42 = 168 squares ÷ \(32 on the roof × 0\.5 sq/.test(await text(p, "#roofCalc")) && /holds about 128 sq for this crew \(3 roofs of 42 sq\)/.test(await text(p, "#roofCalc")), await text(p, "#roofCalc"));
+ok("number box clamps and persists", (st => st.roofCrew === 32 && st.roofBuildings === 4 && st.roofBldgSq === 42)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
+ok("workday capacity for the big crew", /32 men ≈ 96 sq, 2 roofs/.test(await text(p, "#roofWeek .wd:nth-child(3) .w")), await text(p, "#roofWeek .wd:nth-child(3) .w"));
+await p.click('[data-bsq="30"]'); await p.click('[data-bld="1"]'); await p.click('[data-crew="4"]'); await p.click('[data-rate="1.5"]'); await p.waitForTimeout(250);
 ok("timeline: three day rows on one axis with a now line", (await p.locator("#roofTl .tlrow").count()) === 3 && (await p.locator("#roofTl .tlnow").count()) === 1 && /6 AM/.test(await text(p, "#roofTl .ax")) && /Noon/.test(await text(p, "#roofTl .ax")) && /now/.test(await text(p, "#roofTl .ax")),
   (await p.locator("#roofTl .tlrow").count()) + " rows, " + (await p.locator("#roofTl .tlnow").count()) + " now, axis: " + (await text(p, "#roofTl .ax")).replace(/\s+/g, " "));
 ok("today's row: hatched past, dry 4 h, red from 1 PM, dark after sunset", await p.locator('#roofTl [data-day-row="0"]').evaluate(row => {
@@ -300,18 +308,18 @@ ok("each day shows hi/lo, peak gust and a seal-down call", /63° \/ 41°/.test(a
 ok("Wednesday seals (Thu 59° storms, Fri 41° snow, Sat 47° partly → only 1 sunny warm day → hand-seal); Tuesday: Wed 66° clear + Thu no + Fri no → hand-seal", (await p.locator("#roofWeek .wd:nth-child(3) .seal").textContent()) === "hand-seal" && (await p.locator("#roofWeek .wd:nth-child(6) .seal").textContent()) === "seals", await p.locator("#roofWeek .wd:nth-child(6) .seal").textContent());
 await p.click('[data-crew="6"]'); await p.waitForTimeout(300);
 ok("6 on the roof → 4 h job → caution with no margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /Tight\. 4 dry hours until rain \(HRRR\) around 1 PM, you need 4; no margin\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
-await p.click('[data-sq="15"]'); await p.waitForTimeout(300);
+await p.click('[data-bsq="15"]'); await p.waitForTimeout(300);
 ok("15 squares with 6 → 2 h job → go with 2 h margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "GO" && /Good to go\. 4 dry hours until rain \(HRRR\) around 1 PM, 2 more than you need\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
 await p.click('[data-rate="1"]'); await p.waitForTimeout(300);
 ok("pace 1 sq/h with 6 → 3 h job → caution", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /you need 3; 1 hour of margin/.test(await text(p, "#roofHead")) && /× 1 sq per man-hour/.test(await text(p, "#roofCalc")), await text(p, "#roofHead"));
-ok("settings persist", (st => st.roofSquares === 15 && st.roofCrew === 6 && st.roofRate === 1)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
+ok("settings persist", (st => st.roofBldgSq === 15 && st.roofBuildings === 1 && st.roofCrew === 6 && st.roofRate === 1)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
 /* the production log: paste days, measure, adopt */
 await p.click("#roofLogBtn"); await p.waitForTimeout(350);
 ok("log sheet opens empty", await p.locator("#log").evaluate(e => e.classList.contains("on")) && /No days logged yet/.test(await text(p, "#logStats")) && await p.locator("#logUse").isHidden());
 await p.fill("#logText", "date, job, squares, crew, hours\n10/28, Harper St, 28, 4, 7\n10/29, Harper St, 32, 5, 8\n10/30, Oak Ridge, 19, 3, 6\n10/31, Oak Ridge, 24, 4");
 await p.click("#logAdd"); await p.waitForTimeout(300);
 ok("four days parsed, header skipped, missing hours flagged", (await p.locator("#logRows .logrow:not(.h)").count()) === 4 && /0\.75\*/.test(await text(p, "#logRows")) );
-ok("stats: measured 0.75 (slow quarter), typical 0.9, 103 squares", /measured\s+0\.75/i.test(await text(p, "#logStats")) && /typical\s+0\.9/i.test(await text(p, "#logStats")) && /103 sq/.test(await text(p, "#logStats")), (await text(p, "#logStats")).replace(/\s+/g, " "));
+ok("stats: measured 0.75 (slow quarter), typical 0.9, 103 squares", /measured\s+0\.75/i.test(await text(p, "#logStats")) && /6\.0 per man-day at 8 h/.test(await text(p, "#logStats")) && /typical\s+0\.9/i.test(await text(p, "#logStats")) && /103 sq/.test(await text(p, "#logStats")), (await text(p, "#logStats")).replace(/\s+/g, " "));
 ok("the app still plans at the chip pace and says so", /planning at 1 sq\/h; your days say 0\.75/.test(await text(p, "#logStats")), await text(p, "#logStats"));
 await p.click("#logUse"); await p.waitForTimeout(300);
 ok("measured pace adopted: 0.75 sq/h → 15 sq with 6 is a 4 h job", JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofRate === 0.75 && /you need 4;/.test(await text(p, "#roofHead")) && /0\.75 sq\/h ·measured/.test(await text(p, ".roofneed")), await text(p, "#roofHead"));
@@ -331,7 +339,7 @@ ok("roofing explainer lists the rules with their sources", (await text(p, "#info
 ok("explainer says what it's built for", /which days can I book a tear-off/.test(await text(p, "#infoB")) && /HRRR/.test(await text(p, "#infoB")));
 ok("fourteen source links, all external and new-tab", (await p.locator("#infoB .src a").count()) === 14 && await p.locator("#infoB .src a").evaluateAll(as => as.every(a => /^https:\/\//.test(a.href) && a.target === "_blank" && /noopener/.test(a.rel))));
 await p.click("#infoDone"); await p.waitForTimeout(200);
-await p.click('[data-sq="30"]'); await p.click('[data-crew="4"]'); await p.click('[data-rate="1.5"]'); await p.waitForTimeout(200);
+await p.click('[data-bsq="30"]'); await p.click('[data-bld="1"]'); await p.click('[data-crew="4"]'); await p.click('[data-rate="1.5"]'); await p.waitForTimeout(200);
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 if (process.env.SHOT) await p.locator("#roof").screenshot({ path: path.join(process.env.SHOT, "weather-roof.png") });
 if (process.env.SHOT) await p.locator("#roofWeek").screenshot({ path: path.join(process.env.SHOT, "weather-week.png") });

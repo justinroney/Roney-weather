@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~177 checks, every network source mocked, ~22s
+node tests/smoke.mjs        # ~181 checks, every network source mocked, ~23s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -54,8 +54,11 @@ blend's hourly as `alt_wet`, which `roofRisk` treats as a stop — the
 verdict plans on the earlier model) and hourly `cape` (≥ 1500 J/kg is a
 "storm fuel" caution). The forecast call has `past_days=1`, so hourly and
 daily both start yesterday: loops over days start at `ti`, and the Surface
-row sums the 24 h before `hi`. Job size is `S.roofSquares` / `S.roofCrew` /
-`S.roofRate` → `roofNeed()`. The Production log (`S.roofLog`, rows of
+row sums the 24 h before `hi`. Job size is `S.roofBuildings × S.roofBldgSq`
+(`roofSquares()`; w12's `roofSquares` migrates in `load()`), crew
+`S.roofCrew` (chips to 6, a number box to 80), pace `S.roofRate` →
+`roofNeed()`; `roofCapacity(hours, caution)` is men × pace × min(hours,
+roof day), halved (`MARGINAL`) on a caution day. The Production log (`S.roofLog`, rows of
 `{date, job, sq, crew, hrs|null}`; `S.roofDay` fills missing hours) is
 parsed by `parseLog()` — header row optional, tabs/commas/semicolons —
 and summarised by `logStats()`; "measured pace" is the 25th percentile of
@@ -102,6 +105,13 @@ to the foreground, and reloads on `controllerchange` when a previous worker
 existed (deferred while a sheet or overlay is open). So a deploy shows up
 on the next foregrounding, not the next full close. Keep this when touching
 the service-worker block.
+
+**This repo is public; the owner's work data stays off it.** Production
+figures from his employer's jobs inform the model's shape but are never
+committed — no job names, per-day rows, headcounts, links or derived
+figures. The Production log is how such data gets in, on the phone, in
+localStorage. Keep it that way unless the repo is made private and he
+says so explicitly.
 
 Editing happens from a phone: suite green before commit, story-style commit
 messages, the deployed version confirmed from the footer of the forecast.

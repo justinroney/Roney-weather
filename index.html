@@ -228,6 +228,8 @@ svg{display:block}
 .roofneed .lab{margin-right:4px;font-weight:700}
 .chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:999px;padding:0 12px;min-height:34px;font-weight:700;font-size:var(--fs-cap)}
 .chip.on{background:var(--blue);color:#06131B;border-color:transparent}
+.num{width:58px;min-height:34px;border-radius:999px;border:1px solid var(--line);background:var(--card2);color:var(--ink);font:inherit;font-size:var(--fs-cap);font-weight:700;text-align:center;padding:0 6px}
+.num:focus{outline:2px solid var(--blue);outline-offset:1px}
 :root[data-theme="light"] .chip.on,:root:not([data-theme="dark"]) .chip.on{color:#fff}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip.on{color:#06131B}}
 .roofbest{padding:0 14px 12px;font-size:var(--fs-label);line-height:1.45}
@@ -516,7 +518,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w12 · measured pace";
+const APP_VERSION = "w13 · sized for a crew";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -537,9 +539,12 @@ const S = load();
 function load() {
   try {
     const s = JSON.parse(localStorage.getItem(KEY) || "null");
-    if (s && s.schema === 1 && Array.isArray(s.locs)) return s;
+    if (s && s.schema === 1 && Array.isArray(s.locs)) {
+      if (s.roofSquares && !s.roofBuildings) { s.roofBuildings = 1; s.roofBldgSq = s.roofSquares; }   // w12 → w13
+      return s;
+    }
   } catch (e) { /* fall through to a fresh state */ }
-  return { schema: 1, unit: "F", theme: "", locs: [], cur: 0, cache: {}, roofSquares: 30, roofCrew: 4, roofRate: 1.5, roofLog: [], roofDay: 8 };
+  return { schema: 1, unit: "F", theme: "", locs: [], cur: 0, cache: {}, roofBuildings: 1, roofBldgSq: 30, roofCrew: 4, roofRate: 1.5, roofLog: [], roofDay: 8 };
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -942,7 +947,7 @@ function renderAlerts() {
 /* ================= roofing window ================= */
 // Can the deck be opened now and dried in before the weather closes it?
 // Thresholds are the trade's rules of thumb; the explainer spells them out.
-const ROOF_SQUARES = [15, 20, 30, 40, 50], ROOF_CREW = [2, 3, 4, 5, 6], ROOF_RATES = [1, 1.25, 1.5, 2];
+const ROOF_BLDGS = [1, 2, 3, 4], ROOF_BSQ = [15, 20, 30, 42, 50], ROOF_CREW = [2, 3, 4, 5, 6], ROOF_RATES = [0.5, 0.75, 1, 1.5, 2];
 // The production log: rows pasted from the master schedule — date, job, squares done,
 // crew that day, hours if known (else the roof day below). Pace = squares ÷ (crew × hours).
 function parseLog(text) {
@@ -973,10 +978,18 @@ function logStats(rows, dayHours) {
   return { n, median, p25: q(0.25), lo: rates[0], hi: rates[n - 1], overall: totalSq / manHours, totalSq, manHours, logged: rows.filter(r => r.hrs).length };
 }
 const roundRate = v => Math.max(0.25, Math.round(v * 20) / 20);
-const roofRate = () => S.roofRate || 1.5;   // squares torn off and dried in per man-hour; 1.5 is a working crew's pace
+const roofRate = () => S.roofRate || 1.5;   // squares torn off and dried in per man-hour; measure your own in the Production log
+const roofSquares = () => (S.roofBuildings || 1) * (S.roofBldgSq || 30);
 function roofNeed() {
-  const sq = S.roofSquares || 30, crew = S.roofCrew || 4;
-  return Math.max(2, Math.ceil(sq / (crew * roofRate())));
+  return Math.max(2, Math.ceil(roofSquares() / ((S.roofCrew || 4) * roofRate())));
+}
+// What a day can hold: men × pace × the hours on the roof (never more than a roof day).
+// A caution day is planned at about half, not a small reduction: crews won't open a roof
+// they can't dry in the same day, so a marginal forecast costs whole roofs, not minutes.
+const MARGINAL = 0.5;
+function roofCapacity(hours, caution) {
+  const sq = (S.roofCrew || 4) * roofRate() * Math.min(hours, S.roofDay || 8) * (caution ? MARGINAL : 1);
+  return { sq, bldgs: sq / (S.roofBldgSq || 30) };
 }
 // The thresholds, with where each comes from (the explainer repeats this list):
 //   wind    OSHA 29 CFR 1926.968 note: "high wind" is > 40 mph, or > 30 mph when the
@@ -1063,7 +1076,7 @@ function roofPlan(d, hi, need) {
   } else {
     const len = nowWin ? nowWin.len : 0, margin = len - need, stop = nowWin ? stopText(nowWin) : "";
     if (len < need) { verdict = "nogo"; head = `Not enough time. ${stop.charAt(0).toUpperCase() + stop.slice(1)} leaves ${len} dry hour${len === 1 ? "" : "s"}; you need ${need}.`; sub = "Tearing off now risks an open deck when the weather turns. Wait for the window below."; }
-    else if (margin < 2 || (nowWin && nowWin.caution)) { verdict = "caution"; head = margin < 2 ? `Tight. ${len} dry hours until ${stop}, you need ${need}; ${margin === 0 ? "no" : margin + " hour" + (margin === 1 ? "" : "s") + " of"} margin.` : `Workable, but watch the ${[...new Set([...Array(nowWin.len)].map((_, k) => roofRisk(H, nowWin.start + k).why).filter(Boolean))].join(" and ")}.`; sub = margin < 2 ? "A late start, a soft spot in the deck, or a slow delivery eats that margin. Dry in section by section." : `${len} dry hours until ${stop}; ${margin} more than you need.`; }
+    else if (margin < 2 || (nowWin && nowWin.caution)) { verdict = "caution"; head = margin < 2 ? `Tight. ${len} dry hours until ${stop}, you need ${need}; ${margin === 0 ? "no" : margin + " hour" + (margin === 1 ? "" : "s") + " of"} margin.` : `Workable, but watch the ${[...new Set([...Array(nowWin.len)].map((_, k) => roofRisk(H, nowWin.start + k).why).filter(Boolean))].join(" and ")}.`; sub = (margin < 2 ? "A late start, a soft spot in the deck, or a slow delivery eats that margin. " : `${len} dry hours until ${stop}; ${margin} more than you need. `) + (nowWin && nowWin.caution ? "Plan on about half a normal day's output: a crew won't open a roof it can't dry in today, so a marginal forecast costs whole roofs." : "Dry in section by section."); }
     else { verdict = "go"; head = `Good to go. ${len} dry hours until ${stop}, ${margin} more than you need.`; sub = "Calm, dry and warm enough for shingles to seal. Open the deck and get it dried in."; }
   }
   // Best window in the next three days: earliest that fits, else the longest.
@@ -1112,12 +1125,13 @@ function roofSection(d, hi, need) {
     rf("Wind", windLvl, isFinite(wHi) ? `${U.wind(wLo).split(" ")[0]} to ${U.wind(wHi)}, gusts to ${U.wind(gHi)}` + (windLvl === 2 ? " · over OSHA's 30 mph line for material handling" : windLvl === 1 ? " · near OSHA's 30 mph line, hold sheets down" : " · under OSHA's 30 mph line") : "not reported") +
     rf("Temp", tempLvl, isFinite(tLo) ? `${deg(tLo)} to ${deg(tHi)}` + (tLo <= 32 ? " · ice on the deck" : hxHi >= 103 ? " · heat index " + deg(hxHi) + ", NWS danger band" : tLo < 40 ? " · under the 40° shingle minimum (GAF, Owens Corning)" : hxHi >= 90 ? " · heat index " + deg(hxHi) + ", 15-min breaks every 2 h (OSHA)" : hxHi >= 80 ? " · heat index " + deg(hxHi) + ", water and shade (OSHA)" : " · above the 40° shingle minimum, seals well") : "not reported") +
     rf("Daylight", H.is_day[hi] ? 0 : 3, `sunrise ${fmtClock(D.sunrise[ti])} · sunset ${fmtClock(D.sunset[ti])}` + (H.is_day[hi] ? " · " + fmtDur(minsBetween(cur.time, D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light left" : " · no roof work without lighting (OSHA 1926.56)"));
-  const sq = S.roofSquares || 30, crew = S.roofCrew || 4;
-  const chips = `<span class="grp"><span class="lab">Job</span>${ROOF_SQUARES.map(v => `<button class="chip${v === sq ? " on" : ""}" data-sq="${v}" aria-pressed="${v === sq}">${v} sq</button>`).join("")}</span>
-    <span class="grp"><span class="lab">Crew</span>${ROOF_CREW.map(v => `<button class="chip${v === crew ? " on" : ""}" data-crew="${v}" aria-pressed="${v === crew}">${v}</button>`).join("")}</span>
+  const sq = roofSquares(), crew = S.roofCrew || 4, nb = S.roofBuildings || 1, bsq = S.roofBldgSq || 30;
+  const chips = `<span class="grp"><span class="lab">Roofs</span>${ROOF_BLDGS.map(v => `<button class="chip${v === nb ? " on" : ""}" data-bld="${v}" aria-pressed="${v === nb}">${v}</button>`).join("")}<input class="num" type="number" min="1" max="40" step="1" value="${nb}" data-num="roofBuildings" aria-label="Roofs to dry in"></span>
+    <span class="grp"><span class="lab">Size</span>${ROOF_BSQ.map(v => `<button class="chip${v === bsq ? " on" : ""}" data-bsq="${v}" aria-pressed="${v === bsq}">${v} sq</button>`).join("")}<input class="num" type="number" min="5" max="400" step="1" value="${bsq}" data-num="roofBldgSq" aria-label="Squares per roof"></span>
+    <span class="grp"><span class="lab">Crew</span>${ROOF_CREW.map(v => `<button class="chip${v === crew ? " on" : ""}" data-crew="${v}" aria-pressed="${v === crew}">${v}</button>`).join("")}<input class="num" type="number" min="1" max="80" step="1" value="${crew}" data-num="roofCrew" aria-label="Crew on the roof"></span>
     <span class="grp"><span class="lab">Pace</span>${(() => { const st = logStats(S.roofLog || [], S.roofDay || 8); const m = st ? roundRate(st.p25) : null; const opts = m && !ROOF_RATES.includes(m) ? [...ROOF_RATES, m].sort((a, b) => a - b) : ROOF_RATES;
       return opts.map(v => `<button class="chip${v === roofRate() ? " on" : ""}" data-rate="${v}" aria-pressed="${v === roofRate()}">${v} sq/h${v === m ? " ·measured" : ""}</button>`).join(""); })()}<span class="calc" style="width:auto;margin:0">per person</span></span>
-    <span class="calc" id="roofCalc">≈ <b>${need} h to dry in</b>: ${sq} squares ÷ (${crew} on the roof × ${roofRate()} sq per man-hour), rounded up.</span>`;
+    <span class="calc" id="roofCalc">≈ <b>${need} h to dry in</b>: ${nb > 1 ? nb + " × " + bsq + " = " : ""}${sq} squares ÷ (${crew} on the roof × ${roofRate()} sq per man-hour), rounded up. ${(() => { const c = roofCapacity(S.roofDay || 8, false); return `A full ${S.roofDay || 8} h day holds about <b>${Math.round(c.sq)} sq</b> for this crew (${c.bldgs >= 1 ? (lbl => lbl + " roof" + (lbl === "1" ? "" : "s"))(Math.floor(c.bldgs) + (c.bldgs - Math.floor(c.bldgs) >= 0.5 ? "½" : "")) : "under one roof"} of ${bsq} sq); a caution day about half that.`; })()}</span>`;
   const b = P.best;
   const bestText = !b ? "No workable daylight in the next three days."
     : b.len >= need ? `<b>Best window:</b> ${nameOf(b.start)} ${hourOf(b.start)} to ${b.stop.why === "dark" ? "sunset" : hourOf(b.stop.at)}, ${b.len} dry hours${b.caution ? ", with " + b.caution + " cautious hour" + (b.caution === 1 ? "" : "s") : ""}, stopped by ${b.stop.why === "dark" ? "dark" : b.stop.why}.`
@@ -1211,7 +1225,9 @@ function roofOutlook(d, hi, need) {
       const stop = best.stop.why === "dark" ? "sunset" : best.stop.why === "the forecast ends" ? "end of forecast" : best.stop.why.replace("rain in the HRRR model", "rain (HRRR)");
       text = `${fmtHour(H.time[best.start])} to ${best.stop.why === "dark" || best.stop.at >= H.time.length ? "sunset" : fmtHour(H.time[best.stop.at])} · ${best.len} h`;
       const cautions = [...new Set([...Array(best.len)].map((_, j) => roofRisk(H, best.start + j).why).filter(Boolean))];
-      sub = (margin < 0 ? `${-margin} h short for the job` : margin < 2 ? "fits, no margin" : "fits with room") + " · ends with " + stop + (cautions.length ? " · " + cautions.join(", ") : "");
+      const cap = roofCapacity(best.len, best.caution > 0);
+      sub = (margin < 0 ? `${-margin} h short for the job` : margin < 2 ? "fits, no margin" : "fits with room") + " · ends with " + stop + (cautions.length ? " · " + cautions.join(", ") : "")
+        + ` · ${S.roofCrew || 4} men ≈ ${Math.round(cap.sq)} sq, ${cap.bldgs >= 1 ? (cap.bldgs >= 2 ? Math.floor(cap.bldgs) + " roofs" : "1 roof") : "under a roof"}${best.caution ? " (half day)" : ""}`;
     }
     let gust = 0; for (let i = from; i < to; i++) if (H.is_day[i]) gust = Math.max(gust, (H.wind_gusts_10m || [])[i] ?? 0);
     // Seal-down: two of the next three days at ≥ 45° with sun lets the sealant bond.
@@ -1327,7 +1343,7 @@ function openInfo(kind, idx) {
       b = ibig({ go: "Go", caution: "Caution", nogo: "No go", wait: "Wait" }[P.verdict], need + " h to dry in", P.verdict === "go" ? "good" : P.verdict === "caution" ? "warn" : P.verdict === "nogo" ? "crit" : "") +
         ipara(`<b>${esc(P.head)}</b> ${esc(P.sub)}`) +
         `<div class="isec">Built for the trade</div>` +
-        ipara(`A roofer's questions, in order: <b>which days can I book a tear-off</b> (the Workdays list: each day's longest safe window, when the crew can start after dew or frost, what ends it); <b>how big a job fits</b> (job size in squares, crew on the roof and the crew's pace in squares per man-hour give the hours to dry in; paste days from the master schedule into the Production log and the pace becomes the measured one); <b>when exactly does rain arrive, and how sure is that</b> (the Rain and Timing rows: the default blend forecast against NOAA's HRRR model, the sharpest short-range storm model for the US, planning on whichever is earlier); <b>could a storm fire anyway</b> (CAPE, the atmosphere's thunderstorm fuel, flags afternoons over 1,500 J/kg); <b>is the old roof still wet</b> (rain in the last 24 hours); and <b>will the shingles seal</b> (two of the three days after install at 45° with sun, or plan to hand-seal).`) +
+        ipara(`A roofer's questions, in order: <b>which days can I book a tear-off</b> (the Workdays list: each day's longest safe window, when the crew can start after dew or frost, what ends it); <b>how big a job fits</b> (roofs to open × squares each, crew on the roof and the crew's pace in squares per man-hour give the hours to dry in, and what a full day holds for that crew; paste days from your own schedule into the Production log and the pace becomes the measured one — it stays on the phone); <b>when exactly does rain arrive, and how sure is that</b> (the Rain and Timing rows: the default blend forecast against NOAA's HRRR model, the sharpest short-range storm model for the US, planning on whichever is earlier); <b>could a storm fire anyway</b> (CAPE, the atmosphere's thunderstorm fuel, flags afternoons over 1,500 J/kg); <b>is the old roof still wet</b> (rain in the last 24 hours); and <b>will the shingles seal</b> (two of the three days after install at 45° with sun, or plan to hand-seal).`) +
         `<div class="isec">The rules, and where they come from</div>` +
         ipara(`The question is whether the deck can be opened and <b>dried in</b> (underlayment down and lapped) before the weather closes it. Set how long your crew needs from first tear-off to dry-in; the verdict counts the dry daylight hours ahead and compares. Each hour is graded by these rules:`) +
         irow("Stop: rain or snow", "≥ 50% chance or any forecast amount · OSHA: never work a wet, slippery roof") +
@@ -1416,7 +1432,7 @@ function renderLog() {
   if (st) $("logUse").textContent = `Use measured pace · ${roundRate(st.p25)} sq/h`;
   $("logStats").innerHTML = !st ? `<div class="empty">No days logged yet</div>` :
     `<div class="logstats">
-      <div><div class="k">Measured</div><div class="v">${roundRate(st.p25)}</div><div class="s">sq per man-hour · the slower quarter of days, so the plan holds on an ordinary day</div></div>
+      <div><div class="k">Measured</div><div class="v">${roundRate(st.p25)}</div><div class="s">sq per man-hour (${(st.p25 * day).toFixed(1)} per man-day at ${day} h) · the slower quarter of days, so the plan holds on an ordinary one</div></div>
       <div><div class="k">Typical</div><div class="v">${roundRate(st.median)}</div><div class="s">median day · range ${roundRate(st.lo)} to ${roundRate(st.hi)}</div></div>
       <div><div class="k">Logged</div><div class="v">${st.n}</div><div class="s">days · ${st.totalSq} sq · ${Math.round(st.manHours)} man-h${st.logged < st.n ? " · " + (st.n - st.logged) + " at " + day + " h/day" : ""}</div></div>
     </div>` + (roofRate() === roundRate(st.p25) ? `<div class="ipara">The app is planning at your measured pace.</div>` : `<div class="ipara">The app is planning at <b>${roofRate()} sq/h</b>; your days say <b>${roundRate(st.p25)}</b>.</div>`);
@@ -1839,7 +1855,8 @@ $("saved").addEventListener("click", e => {
 });
 document.addEventListener("click", e => {
   if (e.target.closest("[data-back]")) { closeOverlay(); return; }
-  const sqc = e.target.closest("[data-sq]"); if (sqc) { S.roofSquares = +sqc.dataset.sq; save(); render(); return; }
+  const bld = e.target.closest("[data-bld]"); if (bld) { S.roofBuildings = +bld.dataset.bld; save(); render(); return; }
+  const bsq = e.target.closest("[data-bsq]"); if (bsq) { S.roofBldgSq = +bsq.dataset.bsq; save(); render(); return; }
   const crc = e.target.closest("[data-crew]"); if (crc) { S.roofCrew = +crc.dataset.crew; save(); render(); return; }
   const rtc = e.target.closest("[data-rate]"); if (rtc) { S.roofRate = +rtc.dataset.rate; save(); render(); return; }
   const info = e.target.closest("[data-info]"); if (info) { openInfo(info.dataset.info); return; }
@@ -1852,6 +1869,11 @@ document.addEventListener("click", e => {
   else if (b.dataset.act === "map") openOverlay("map");
   else if (b.dataset.act === "log") openLog();
   else if (b.dataset.act === "alerts") openOverlay("alerts");
+});
+document.addEventListener("change", e => {
+  const n = e.target.closest("[data-num]"); if (!n) return;
+  const v = Math.max(+n.min, Math.min(+n.max, Math.round(+n.value || +n.min)));
+  S[n.dataset.num] = v; save(); render();
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") { closeSheet(); closeInfo(); closeLog(); if (location.hash) closeOverlay(); }
