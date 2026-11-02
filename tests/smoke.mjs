@@ -177,7 +177,7 @@ ok("humidity tile has the dew point", /dew point 44°/.test(await text(p, ".tile
 ok("air tile 42 · Good with PM2.5", (await text(p, ".tile.aq .v")) === "42 · Good" && /PM2.5 9/.test(await text(p, ".tile.aq .s")));
 ok("pressure in inHg, rising · clearing", (await text(p, ".tile:nth-child(6) .v")) === "30.07 inHg" && (await text(p, ".tile:nth-child(6) .s")) === "rising · clearing");
 ok("visibility 10 mi, clear · partly cloudy", (await text(p, ".tile:nth-child(7) .v")) === "10 mi" && (await text(p, ".tile:nth-child(7) .s")) === "Clear · partly cloudy");
-ok("sun tile with day length", (await text(p, ".tile:nth-child(8) .v")) === "7:48 AM" && /sets 6:32 PM · 10h 44m of light/.test(await text(p, ".tile:nth-child(8) .s")), await text(p, ".tile:nth-child(8) .s"));
+ok("sun tile with day length", (await text(p, ".tile:nth-child(8) .v")) === "7:48 AM" && /sets 6:32 PM · 10h 44m light/.test(await text(p, ".tile:nth-child(8) .s")), await text(p, ".tile:nth-child(8) .s"));
 ok("moon tile has a phase name", /moon|crescent|quarter|gibbous/i.test(await text(p, ".tile:nth-child(9) .s")));
 ok("nowcast: rain in ~30 min", (await text(p, "#nowcast .t span")) === "Rain in ~30 min", await text(p, "#nowcast .t span"));
 ok("nowcast has 8 bars, 4 wet", (await p.locator(".ncbars i").count()) === 8 && (await p.locator(".ncbars i:not(.dry)").count()) === 4);

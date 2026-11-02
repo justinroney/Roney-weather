@@ -171,9 +171,10 @@ svg{display:block}
 /* ---------- tiles ---------- */
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;text-align:left;font:inherit;color:inherit;
-  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);min-width:0;display:block;width:100%}
+  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);min-width:0;display:flex;flex-direction:column;width:100%;height:100%}
 .tile:active{transform:scale(.98)}
-.tile .m{height:3px;border-radius:2px;background:var(--card2);margin-top:9px;position:relative;overflow:hidden}
+.tile .m{height:3px;border-radius:2px;background:var(--card2);margin-top:auto;padding-top:0;position:relative;overflow:hidden;flex:none}
+.tile .s{margin-bottom:9px}
 .tile .m i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--tone,var(--blue))}
 .tile.good{--tone:var(--good)}
 .tile .k{font-size:var(--fs-micro);font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
@@ -720,7 +721,7 @@ function forecast(c, l) {
     ${aqTile}
     ${tile("Pressure", pNow != null ? U.pres(pNow) : "Not reported", pNow != null ? pTrend + (pTrend === "rising" ? " · clearing" : pTrend === "falling" ? " · unsettled" : " · no change") : "no pressure reading", "pressure", pNow == null ? null : clamp01((pNow - 980) / 70), pTrend === "falling" ? "warn" : "good")}
     ${tile("Visibility", cur.visibility != null ? U.dist(cur.visibility) : "Not reported", (cur.visibility != null ? visWord(cur.visibility) : "") + (cur.cloud_cover != null ? (cur.visibility != null ? " · " : "") + cloudWord(cur.cloud_cover) : ""), "visibility", cur.visibility == null ? null : clamp01(cur.visibility / 16093), cur.visibility == null ? "" : cur.visibility > 9600 ? "good" : cur.visibility > 1600 ? "warn" : "crit")}
-    ${tile("Sun", fmtClock(D.sunrise[ti]), "sets " + fmtClock(D.sunset[ti]) + " · " + fmtDur(minsBetween(D.sunrise[ti], D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light", "sun", clamp01(minsBetween(D.sunrise[ti], cur.time) / Math.max(1, minsBetween(D.sunrise[ti], D.sunset[ti]))), "info")}
+    ${tile("Sun", fmtClock(D.sunrise[ti]), "sets " + fmtClock(D.sunset[ti]) + " · " + fmtDur(minsBetween(D.sunrise[ti], D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " light", "sun", clamp01(minsBetween(D.sunrise[ti], cur.time) / Math.max(1, minsBetween(D.sunrise[ti], D.sunset[ti]))), "info")}
     ${tile("Moon", moon.illum + "% lit", moon.name, "moon", moon.illum / 100, "info")}
   </div><div class="legend">Tap any tile for what the number means. The thin bar is where it sits on its scale.</div>`;
 
