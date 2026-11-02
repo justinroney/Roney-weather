@@ -182,6 +182,38 @@ svg{display:block}
 .tile .s{font-size:var(--fs-cap);color:var(--faint);margin-top:1px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tile.aq .v{color:var(--tone)}
 
+/* ---------- roofing window ---------- */
+.roof{padding:0;overflow:hidden}
+.roof-head{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;
+  background:none;border:none;padding:14px 14px 12px;font:inherit;color:inherit}
+.roof-head .chev{color:var(--faint);font-size:20px}
+.verdict{display:inline-grid;place-items:center;min-width:64px;height:64px;border-radius:16px;font-weight:900;font-size:15px;letter-spacing:.06em;
+  background:var(--tone);color:#06131B;padding:0 8px;text-align:center;line-height:1.05}
+.verdict.go{--tone:var(--good)} .verdict.caution{--tone:var(--warn)} .verdict.nogo{--tone:var(--crit)} .verdict.wait{--tone:var(--dim)}
+:root[data-theme="light"] .verdict,:root:not([data-theme="dark"]) .verdict{color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .verdict{color:#06131B}}
+.roof-head b{display:block;font-size:var(--fs-body);line-height:1.35}
+.roof-head small{display:block;color:var(--dim);font-size:var(--fs-cap);margin-top:2px;line-height:1.4}
+.roofstrip{display:flex;gap:1.5px;height:22px;padding:0 14px}
+.roofstrip i{flex:1;border-radius:2px;background:var(--card2)}
+.roofstrip i.r0{background:var(--good)} .roofstrip i.r1{background:var(--warn)} .roofstrip i.r2{background:var(--crit)}
+.roofstrip i.r3{background:var(--card2)} .roofstrip i.now{outline:2px solid var(--ink);outline-offset:-2px;z-index:1}
+.roofdays{display:flex;padding:4px 14px 0;font-size:var(--fs-micro);color:var(--faint);font-weight:700}
+.roofdays span{flex:1}
+.rooffacts{padding:10px 14px 4px;display:grid;gap:0}
+.rf{display:grid;grid-template-columns:20px 72px 1fr;gap:8px;align-items:baseline;padding:6px 0;border-top:1px solid var(--line);font-size:var(--fs-label)}
+.rf .k{color:var(--dim);font-weight:700;font-size:var(--fs-cap);text-transform:uppercase;letter-spacing:.06em}
+.rf .d{width:10px;height:10px;border-radius:50%;background:var(--tone,var(--good));align-self:center;justify-self:center}
+.rf.r1 .d{--tone:var(--warn)} .rf.r2 .d{--tone:var(--crit)} .rf.r3 .d{--tone:var(--faint)}
+.roofneed{display:flex;align-items:center;gap:6px;padding:8px 14px 12px;font-size:var(--fs-cap);color:var(--dim);flex-wrap:wrap;border-top:1px solid var(--line)}
+.roofneed .lab{margin-right:4px;font-weight:700}
+.chip{border:1px solid var(--line);background:var(--card2);color:var(--ink);border-radius:999px;padding:0 12px;min-height:34px;font-weight:700;font-size:var(--fs-cap)}
+.chip.on{background:var(--blue);color:#06131B;border-color:transparent}
+:root[data-theme="light"] .chip.on,:root:not([data-theme="dark"]) .chip.on{color:#fff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .chip.on{color:#06131B}}
+.roofbest{padding:0 14px 12px;font-size:var(--fs-label);line-height:1.45}
+.roofbest b{color:var(--good)}
+
 /* ---------- map launcher ---------- */
 .mapbtn{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;
   background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-top:11px;
@@ -416,7 +448,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w6 · nothing blank";
+const APP_VERSION = "w7 · roofing window";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -439,7 +471,7 @@ function load() {
     const s = JSON.parse(localStorage.getItem(KEY) || "null");
     if (s && s.schema === 1 && Array.isArray(s.locs)) return s;
   } catch (e) { /* fall through to a fresh state */ }
-  return { schema: 1, unit: "F", theme: "", locs: [], cur: 0, cache: {} };
+  return { schema: 1, unit: "F", theme: "", locs: [], cur: 0, cache: {}, roofHours: 6 };
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -728,6 +760,8 @@ function forecast(c, l) {
   const mapAlerts = alerts.filter(a => a.geom).length;
   h += `<button class="mapbtn" data-act="map">${RADAR_ICO}<span><b>Radar &amp; warnings</b><small>${mapAlerts ? mapAlerts + " warning area" + (mapAlerts > 1 ? "s" : "") + " on the map" : "Past two hours, next half hour"}</small></span><span class="chev">›</span></button>`;
 
+  h += roofSection(d, hi, S.roofHours || 6);
+
   // Next 24 hours, starting at the current hour.
   let hours = "";
   for (let i = hi; i < Math.min(hi + 24, H.time.length); i++) {
@@ -828,6 +862,120 @@ function renderAlerts() {
   </details>`).join("") + `<div class="note">${c && c.alertsAt ? "Checked " + esc(ago(c.alertsAt)) + " · " : ""}<button data-act="refresh">Refresh</button></div>`;
 }
 
+/* ================= roofing window ================= */
+// Can the deck be opened now and dried in before the weather closes it?
+// Thresholds are the trade's rules of thumb; the explainer spells them out.
+const ROOF_HOURS = [4, 6, 8, 10];
+function roofRisk(H, i) {                     // 0 fine · 1 caution · 2 stop · 3 dark
+  const pp = (H.precipitation_probability || [])[i] ?? 0, pr = (H.precipitation || [])[i] ?? 0, code = H.weather_code[i];
+  const w = (H.wind_speed_10m || [])[i] ?? 0, g = (H.wind_gusts_10m || [])[i] ?? w * 1.5, t = H.temperature_2m[i];
+  if (!H.is_day[i]) return { lvl: 3, why: "dark" };
+  if (code >= 95) return { lvl: 2, why: "thunderstorms" };
+  if (pp >= 50 || pr > 0.01 || code >= 51) return { lvl: 2, why: (code >= 71 && code <= 77) || code === 85 || code === 86 ? "snow" : "rain" };
+  if (w >= 25 || g >= 35) return { lvl: 2, why: "wind" };
+  if (t <= 32) return { lvl: 2, why: "freezing" };
+  if (pp >= 25) return { lvl: 1, why: "a rain chance" };
+  if (w >= 18 || g >= 28) return { lvl: 1, why: "gusts" };
+  if (t < 40) return { lvl: 1, why: "cold" };
+  if (t >= 95) return { lvl: 1, why: "heat" };
+  return { lvl: 0, why: "" };
+}
+// Contiguous daylight runs with nothing worse than a caution, over the hours given.
+function roofWindows(H, from, to) {
+  const out = []; let cur = null;
+  for (let i = from; i < to; i++) {
+    const r = roofRisk(H, i);
+    if (r.lvl <= 1) { if (!cur) cur = { start: i, end: i, caution: 0, stop: null }; cur.end = i; if (r.lvl === 1) cur.caution++; }
+    else if (cur) { cur.stop = { at: i, why: r.why }; out.push(cur); cur = null; }
+  }
+  if (cur) { cur.stop = { at: to, why: "the forecast ends" }; out.push(cur); }
+  return out.map(w => ({ ...w, len: w.end - w.start + 1 }));
+}
+function roofPlan(d, hi, need) {
+  const H = d.hourly, cur = d.current, to = Math.min(H.time.length, hi + 72);
+  const windows = roofWindows(H, hi, to);
+  const now = roofRisk(H, hi), nowWin = windows.find(w => w.start === hi) || null;
+  const M = d.minutely_15; let soon = -1;
+  if (M && M.precipitation) {
+    const q = cur.time.slice(0, 14) + (Math.floor(parseInt(cur.time.slice(14, 16), 10) / 15) * 15).toString().padStart(2, "0");
+    const i = Math.max(0, M.time.indexOf(q)); soon = M.precipitation.slice(i, i + 8).findIndex(v => v > 0.004);
+  }
+  let verdict, head, sub;
+  const nameOf = i => fmtDay(H.time[i].slice(0, 10), cur.time.slice(0, 10)), hourOf = i => fmtHour(H.time[i]);
+  const stopText = w => w.stop.why === "dark" ? "sunset" : w.stop.why === "the forecast ends" ? "the end of the forecast" : w.stop.why + " around " + hourOf(w.stop.at);
+  if (now.lvl === 3) {
+    verdict = "wait"; head = "It's dark. Wait for daylight.";
+    const w = windows[0]; sub = w ? `First light brings ${w.len} workable hour${w.len === 1 ? "" : "s"} from ${hourOf(w.start)} ${nameOf(w.start).toLowerCase() === "today" ? "" : nameOf(w.start)} before ${stopText(w)}.` : "No workable daylight in the next three days.";
+  } else if (soon >= 0 && soon < 8) {
+    verdict = "nogo"; head = (soon === 0 ? "Rain is falling now." : `Rain in about ${soon * 15} minutes.`) + " Keep the deck covered.";
+    sub = "The 15-minute nowcast sees precipitation inside the next two hours; nothing opens up until it clears.";
+  } else if (now.lvl === 2) {
+    verdict = "nogo"; head = ({ rain: "Rain", snow: "Snow", thunderstorms: "Lightning risk", wind: "Dangerous wind", freezing: "Freezing temperatures" })[now.why] + " right now. Don't open the deck.";
+    const w = windows[0]; sub = w ? `Next workable stretch: ${nameOf(w.start)} ${hourOf(w.start)}, ${w.len} h before ${stopText(w)}.` : "Nothing workable in the next three days.";
+  } else {
+    const len = nowWin ? nowWin.len : 0, margin = len - need, stop = nowWin ? stopText(nowWin) : "";
+    if (len < need) { verdict = "nogo"; head = `Not enough time. ${stop.charAt(0).toUpperCase() + stop.slice(1)} leaves ${len} dry hour${len === 1 ? "" : "s"}; you need ${need}.`; sub = "Tearing off now risks an open deck when the weather turns. Wait for the window below."; }
+    else if (margin < 2 || (nowWin && nowWin.caution)) { verdict = "caution"; head = margin < 2 ? `Tight. ${len} dry hours until ${stop}, you need ${need}; ${margin === 0 ? "no" : margin + " hour" + (margin === 1 ? "" : "s") + " of"} margin.` : `Workable, but watch the ${[...new Set([...Array(nowWin.len)].map((_, k) => roofRisk(H, nowWin.start + k).why).filter(Boolean))].join(" and ")}.`; sub = margin < 2 ? "A late start, a soft spot in the deck, or a slow delivery eats that margin. Dry in section by section." : `${len} dry hours until ${stop}; ${margin} more than you need.`; }
+    else { verdict = "go"; head = `Good to go. ${len} dry hours until ${stop}, ${margin} more than you need.`; sub = "Calm, dry and warm enough for shingles to seal. Open the deck and get it dried in."; }
+  }
+  // Best window in the next three days: earliest that fits, else the longest.
+  const fits = windows.filter(w => w.len >= need);
+  const best = fits[0] || windows.slice().sort((a, b) => b.len - a.len)[0] || null;
+  return { verdict, head, sub, windows, best, now, nowWin, to };
+}
+function roofSection(d, hi, need) {
+  const H = d.hourly, D = d.daily, cur = d.current, today = cur.time.slice(0, 10);
+  const P = roofPlan(d, hi, need);
+  const label = { go: "GO", caution: "CAU-TION", nogo: "NO GO", wait: "WAIT" }[P.verdict].replace("-", "<br>");
+  // 48-hour strip from the current hour, day labels underneath.
+  let strip = "", days = "", lastDay = "", cells = Math.min(48, H.time.length - hi), dayCounts = [];
+  for (let i = hi; i < hi + cells; i++) {
+    const r = roofRisk(H, i), dname = fmtDay(H.time[i].slice(0, 10), today);
+    strip += `<i class="r${r.lvl}${i === hi ? " now" : ""}" title="${esc(fmtHour(H.time[i]))} ${esc(dname)}: ${esc(r.lvl === 0 ? "fine" : r.why)}"></i>`;
+    if (dname !== lastDay) { dayCounts.push({ n: dname, c: 0 }); lastDay = dname; }
+    dayCounts[dayCounts.length - 1].c++;
+  }
+  days = dayCounts.map(x => `<span style="flex:${x.c}">${x.c >= 6 ? esc(x.n) : ""}</span>`).join("");
+  // Factor rows for the hours you'd be working.
+  const span = P.nowWin ? [P.nowWin.start, Math.min(P.nowWin.start + need, P.nowWin.end + 1)] : [hi, Math.min(hi + need, H.time.length)];
+  const rng = (arr) => { let a = Infinity, b = -Infinity; for (let i = span[0]; i < span[1]; i++) { const v = (arr || [])[i]; if (v != null) { a = Math.min(a, v); b = Math.max(b, v); } } return [a, b]; };
+  let firstWet = -1; for (let i = hi; i < P.to; i++) { const r = roofRisk(H, i); if (r.why === "rain" || r.why === "snow" || r.why === "thunderstorms") { firstWet = i; break; } }
+  const [wLo, wHi] = rng(H.wind_speed_10m), [gLo, gHi] = rng(H.wind_gusts_10m), [tLo, tHi] = rng(H.temperature_2m);
+  const storm = (() => { for (let i = hi; i < P.to; i++) if (H.weather_code[i] >= 95) return i; return -1; })();
+  const nameOf = i => fmtDay(H.time[i].slice(0, 10), today), hourOf = i => fmtHour(H.time[i]);
+  const when = i => (nameOf(i) === "Today" ? "" : nameOf(i) + " ") + hourOf(i);
+  const rainLvl = firstWet < 0 ? 0 : firstWet < hi + need ? 2 : firstWet < hi + need + 3 ? 1 : 0;
+  const windLvl = wHi >= 25 || gHi >= 35 ? 2 : wHi >= 18 || gHi >= 28 ? 1 : 0;
+  const tempLvl = tLo <= 32 ? 2 : tLo < 40 || tHi >= 95 ? 1 : 0;
+  const stormLvl = storm < 0 ? 0 : storm < hi + need ? 2 : 1;
+  const ti = Math.max(0, D.time.indexOf(today));
+  const facts =
+    rf("Rain", rainLvl, firstWet < 0 ? "none in the next three days" : `${roofRisk(H, firstWet).why} from ${when(firstWet)}${firstWet > hi ? " (" + (firstWet - hi) + " h away)" : ""}`) +
+    rf("Storms", stormLvl, storm < 0 ? "no thunder in the forecast" : `thunder possible ${when(storm)} · lightning clears a roof`) +
+    rf("Wind", windLvl, isFinite(wHi) ? `${U.wind(wLo).split(" ")[0]} to ${U.wind(wHi)}, gusts to ${U.wind(gHi)}` + (windLvl === 2 ? " · too much for sheets and ladders" : windLvl === 1 ? " · hold underlayment down" : " · fine") : "not reported") +
+    rf("Temp", tempLvl, isFinite(tLo) ? `${deg(tLo)} to ${deg(tHi)}` + (tempLvl === 2 ? " · ice on the deck" : tLo < 40 ? " · shingles brittle, sealant slow" : tHi >= 95 ? " · scuffing and heat stress" : " · shingles seal well") : "not reported") +
+    rf("Daylight", H.is_day[hi] ? 0 : 3, `sunrise ${fmtClock(D.sunrise[ti])} · sunset ${fmtClock(D.sunset[ti])}` + (H.is_day[hi] ? " · " + fmtDur(minsBetween(cur.time, D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light left" : ""));
+  const chips = ROOF_HOURS.map(h => `<button class="chip${h === need ? " on" : ""}" data-roof="${h}" aria-pressed="${h === need}">${h} h</button>`).join("");
+  const b = P.best;
+  const bestText = !b ? "No workable daylight in the next three days."
+    : b.len >= need ? `<b>Best window:</b> ${nameOf(b.start)} ${hourOf(b.start)} to ${b.stop.why === "dark" ? "sunset" : hourOf(b.stop.at)}, ${b.len} dry hours${b.caution ? ", with " + b.caution + " cautious hour" + (b.caution === 1 ? "" : "s") : ""}, stopped by ${b.stop.why === "dark" ? "dark" : b.stop.why}.`
+    : `No window of ${need} dry daylight hours in the next three days. Longest: ${nameOf(b.start)} ${hourOf(b.start)}, ${b.len} h before ${b.stop.why}.`;
+  return `<div class="sec-label">Roofing window <span class="aside">tear-off to dry-in</span></div>
+  <div class="card roof" id="roof">
+    <button class="roof-head" data-info="roof" aria-label="Roofing verdict: ${esc(P.head)}. Tap for the rules">
+      <span class="verdict ${P.verdict}" id="roofVerdict">${label}</span>
+      <span><b id="roofHead">${esc(P.head)}</b><small>${esc(P.sub)}</small></span><span class="chev">›</span>
+    </button>
+    <div class="roofstrip" id="roofStrip" aria-label="Next 48 hours, coloured by roofing risk">${strip}</div>
+    <div class="roofdays">${days}</div>
+    <div class="rooffacts">${facts}</div>
+    <div class="roofneed"><span class="lab">Hours to dry in</span>${chips}</div>
+    <div class="roofbest" id="roofBest">${bestText}</div>
+  </div>
+  <div class="legend">Green hours are safe to have the deck open, amber need care, red stop work, grey is dark. The outlined cell is now. Hours to dry in is tear-off to underlayment down.</div>`;
+}
+function rf(k, lvl, text) { return `<div class="rf r${lvl}"><span class="d"></span><span class="k">${esc(k)}</span><span>${esc(text)}</span></div>`; }
+
 /* ================= the explainer sheet ================= */
 function ctx() {
   const l = curLoc(), c = cacheFor(l); if (!l || !c || !c.d) return null;
@@ -921,6 +1069,22 @@ function openInfo(kind, idx) {
         irow("Next full moon", m.toFull === 0 ? "tonight" : "in " + m.toFull + " days") + irow("Next new moon", m.toNew === 0 ? "tonight" : "in " + m.toNew + " days");
       break;
     }
+    case "roof": {
+      const P = roofPlan(x.d, hi, S.roofHours || 6);
+      title = "Roofing window";
+      b = ibig({ go: "Go", caution: "Caution", nogo: "No go", wait: "Wait" }[P.verdict], (S.roofHours || 6) + " h to dry in", P.verdict === "go" ? "good" : P.verdict === "caution" ? "warn" : P.verdict === "nogo" ? "crit" : "") +
+        ipara(`<b>${esc(P.head)}</b> ${esc(P.sub)}`) +
+        `<div class="isec">The rules</div>` +
+        ipara(`The question is whether the deck can be opened and <b>dried in</b> (underlayment down and lapped) before the weather closes it. Set how long your crew needs from first tear-off to dry-in; the verdict counts the dry daylight hours ahead and compares.`) +
+        irow("Stop: rain or snow", "≥ 50% chance, any forecast amount") + irow("Stop: lightning", "thunder in the forecast") +
+        irow("Stop: wind", "≥ 25 mph, or gusts ≥ 35") + irow("Stop: freezing", "≤ 32°, ice on the deck") +
+        irow("Caution: rain", "25–49% chance") + irow("Caution: wind", "≥ 18 mph, or gusts ≥ 28") +
+        irow("Caution: cold", "< 40°, brittle shingles, slow sealing") + irow("Caution: heat", "≥ 95°, scuffing, heat stress") +
+        irow("Dark", "no work between sunset and sunrise") +
+        ipara(`<b>Go</b> needs at least two hours of margin past what you asked for. <b>Caution</b> is a fit with under two hours spare, or a window with gusty, cold or showery hours in it. The 15-minute nowcast overrides everything: rain inside two hours is a no go.`) +
+        ipara(`This is a forecast, not a promise. Check the radar before the first cut, keep tarps on the roof, and dry in section by section.`);
+      break;
+    }
     case "hour": {
       const i = idx, [cond] = wx(H.weather_code[i]), pp = (H.precipitation_probability || [])[i];
       title = (i === hi ? "Now" : fmtHour(H.time[i])) + " · " + fmtDay(H.time[i].slice(0, 10), today);
@@ -959,7 +1123,7 @@ function forecastUrl(l) {
   const p = new URLSearchParams({
     latitude: l.lat, longitude: l.lon, timezone: "auto", forecast_days: "10",
     current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,dew_point_2m,pressure_msl,visibility,cloud_cover",
-    hourly: "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,is_day,uv_index,pressure_msl,wind_speed_10m,relative_humidity_2m",
+    hourly: "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,is_day,uv_index,pressure_msl,wind_speed_10m,wind_gusts_10m,relative_humidity_2m",
     minutely_15: "precipitation,snowfall",
     daily: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,daylight_duration,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max",
     temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch",
@@ -1344,6 +1508,7 @@ $("saved").addEventListener("click", e => {
 });
 document.addEventListener("click", e => {
   if (e.target.closest("[data-back]")) { closeOverlay(); return; }
+  const chip = e.target.closest("[data-roof]"); if (chip) { S.roofHours = +chip.dataset.roof; save(); render(); return; }
   const info = e.target.closest("[data-info]"); if (info) { openInfo(info.dataset.info); return; }
   const hr = e.target.closest("[data-hour]"); if (hr) { openInfo("hour", +hr.dataset.hour); return; }
   const dy = e.target.closest("[data-day]"); if (dy) { openInfo("day", +dy.dataset.day); return; }

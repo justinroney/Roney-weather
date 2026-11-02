@@ -25,7 +25,7 @@ const ok = (name, cond, detail) => {
 
 /* ---------- fixture: a plausible Open-Meteo answer, pinned to one clock ---------- */
 const NOW = "2026-11-01T09:12";
-const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], relative_humidity_2m: [] };
+const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], wind_gusts_10m: [], relative_humidity_2m: [] };
 for (let i = 0; i < 48; i++) {
   const d = i < 24 ? "2026-11-01" : "2026-11-02", h = i % 24;
   hourly.time.push(d + "T" + String(h).padStart(2, "0") + ":00");
@@ -38,6 +38,7 @@ for (let i = 0; i < 48; i++) {
   hourly.apparent_temperature.push(hourly.temperature_2m[i] - 3);
   hourly.precipitation.push(h >= 14 && h <= 17 ? 0.05 : 0);
   hourly.wind_speed_10m.push(8 + (h % 5));
+  hourly.wind_gusts_10m.push(8 + (h % 5) + 9);
   hourly.relative_humidity_2m.push(60);
 }
 // 15-minute nowcast: dry for 30 min, then rain for an hour.
@@ -185,6 +186,7 @@ ok("alert banner leads with the tornado warning", (await text(p, ".alertbar b"))
 ok("banner is the first thing in view", await p.locator("#view > :first-child").evaluate(e => e.classList.contains("alertbar")));
 ok("alerts fetched by point", alertCalls.some(u => /alerts\/active\?point=36\.7070%2C-97\.0856/.test(u)), alertCalls.join(" "));
 ok("map button counts the warning area", /1 warning area on the map/.test(await text(p, ".mapbtn small")));
+ok("roofing defers to the nowcast when rain is minutes away", (await text(p, "#roofHead")) === "Rain in about 30 minutes. Keep the deck covered.", await text(p, "#roofHead"));
 
 /* ---------- 2b. explainers ---------- */
 console.log("explainers");
@@ -233,6 +235,30 @@ await p.click("#themeBtn"); await p.waitForTimeout(100);
 ok("theme toggles back to dark", (await p.evaluate(() => document.documentElement.dataset.theme)) === "dark");
 const state = await p.context().storageState();
 ok("state persisted", JSON.parse(state.origins[0].localStorage.find(x => x.name === "roney-weather-v1").value).locs.length === 1);
+await p.context().close();
+
+/* ---------- 2c. roofing window ---------- */
+console.log("roofing");
+// Same saved place, empty cache, and no 15-minute data: the hourly forecast alone decides.
+const bare = JSON.parse(JSON.stringify(state));
+{ const ls = bare.origins[0].localStorage.find(x => x.name === "roney-weather-v1"); const S = JSON.parse(ls.value); S.cache = {}; ls.value = JSON.stringify(S); }
+p = await page({ state: bare, noMinutely: true });
+await p.goto(BASE); await p.waitForTimeout(600);
+ok("roofing card present with a verdict", (await p.locator("#roof").count()) === 1 && (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "NOGO");
+ok("headline counts the dry hours against the need", (await text(p, "#roofHead")) === "Not enough time. Rain around 2 PM leaves 5 dry hours; you need 6.", await text(p, "#roofHead"));
+ok("48-hour strip, now outlined, red from 2 PM, grey at night", (await p.locator("#roofStrip i").count()) === 39 && (await p.locator("#roofStrip i.now").count()) === 1
+  && await p.locator("#roofStrip i:nth-child(6)").evaluate(e => e.classList.contains("r2")) && await p.locator("#roofStrip i:nth-child(12)").evaluate(e => e.classList.contains("r3")));
+ok("factor rows: rain, storms, wind, temp, daylight", (await p.locator(".rf").count()) === 5 && /rain from 2 PM \(5 h away\)/.test(await text(p, ".rooffacts")) && /shingles seal well/.test(await text(p, ".rooffacts")) && /of light left/.test(await text(p, ".rooffacts")));
+ok("best window is tomorrow morning, tight fit", /Best window:.*Mon 8 AM to 2 PM, 6 dry hours.*stopped by rain/.test(await text(p, "#roofBest")), await text(p, "#roofBest"));
+await p.click('[data-roof="4"]'); await p.waitForTimeout(300);
+ok("4 hours to dry in → caution, 1 hour of margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /Tight\. 5 dry hours until rain around 2 PM, you need 4; 1 hour of margin\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
+ok("setting persists", JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofHours === 4);
+await p.click(".roof-head"); await p.waitForTimeout(300);
+ok("roofing explainer lists the rules", (await text(p, "#infoT")) === "Roofing window" && /Stop: lightning/.test(await text(p, "#infoB")) && /dried in/.test(await text(p, "#infoB")));
+await p.click("#infoDone"); await p.waitForTimeout(200);
+await p.click('[data-roof="6"]'); await p.waitForTimeout(200);
+ok("no errors", p.errors.length === 0, p.errors.join(" | "));
+if (process.env.SHOT) await p.locator("#roof").screenshot({ path: path.join(process.env.SHOT, "weather-roof.png") });
 await p.context().close();
 
 /* ---------- 3b. the alerts screen ---------- */
@@ -289,8 +315,6 @@ await p.context().close();
 
 /* ---------- 3d. a quiet day: no alerts, no minute data — still nothing blank ---------- */
 console.log("quiet day");
-const bare = JSON.parse(JSON.stringify(state));
-{ const ls = bare.origins[0].localStorage.find(x => x.name === "roney-weather-v1"); const S = JSON.parse(ls.value); S.cache = {}; ls.value = JSON.stringify(S); }
 p = await page({ state: bare, noAlerts: true, noMinutely: true });
 await p.goto(BASE); await p.waitForTimeout(600);
 ok("no banner, an all-clear line instead", (await p.locator(".alertbar").count()) === 0 && /No active weather alerts/.test(await text(p, ".allclear")) && /checked just now/.test(await text(p, ".allclear")));

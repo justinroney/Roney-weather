@@ -6,7 +6,7 @@ A personal weather app: one hand-written `index.html`, zero dependencies, no
 build step. Installable as its own app from Chrome (⋮ → Install app) or
 Safari (Share → Add to Home Screen).
 
-What it does (w6):
+What it does (w7):
 
 - **Places** — search a city, or use the phone's location. Saved on the
   device; the last forecast per place is kept so the app answers with no signal.
@@ -23,6 +23,13 @@ What it does (w6):
   and dew point, rain chance and total, UV, air quality (US AQI with PM2.5
   and ozone), pressure and its trend, visibility and cloud cover, sunrise and
   sunset, moon phase.
+- **Roofing window** — can the deck be opened now and dried in before the
+  weather closes it? A GO / CAUTION / NO GO verdict with the reason ("Rain
+  around 2 PM leaves 5 dry hours; you need 6"), a 48-hour strip coloured by
+  risk, the factors (rain, storms, wind, temperature, daylight), a setting
+  for how many hours the crew needs from tear-off to underlayment, and the
+  best window in the next three days. The 15-minute nowcast overrides
+  everything when rain is minutes away. Thresholds are in the explainer.
 - **Ahead** — 24 hours from the current hour, and 10 days with range bars.
 - **Nothing blank, everything explained** — a one-sentence day summary in
   the hero ("Rain possible around 2 PM until about 6 PM, high 63°. Tomorrow
@@ -55,7 +62,7 @@ hurricane tracks from the NHC feeds, storm reports, an hourly detail sheet.
 - `sw.js` — offline shell (network-first). `CACHE` must match `APP_VERSION`.
 - `manifest.json`, `icons/` — the install surface. `icons/icon.svg` is the
   source; the PNGs were rendered from it with headless Chromium.
-- `tests/smoke.mjs` — the suite (~113 checks). Open-Meteo, NWS, Rain Viewer
+- `tests/smoke.mjs` — the suite (~123 checks). Open-Meteo, NWS, Rain Viewer
   and the map tiles are all mocked at the network layer.
 
 ## Tests

@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~113 checks, every network source mocked, ~15s
+node tests/smoke.mjs        # ~123 checks, every network source mocked, ~16s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -37,6 +37,17 @@ hours and days from `ctx()`. `daySummary()` writes the hero sentence from
 the hourly codes/probabilities. Keep that bar when adding anything: a
 missing value shows *why* ("Not reported", "no air-quality model covers
 this spot"), never "—"; the suite greps the view for bare dashes.
+
+**Roofing window** (w7): `roofRisk(H, i)` grades each hour 0 fine / 1
+caution / 2 stop / 3 dark from the trade's thresholds (rain ≥ 50% or any
+amount, thunder, wind ≥ 25 or gusts ≥ 35, ≤ 32° stop; 25–49% rain, wind
+≥ 18 / gusts ≥ 28, < 40°, ≥ 95° caution). `roofWindows()` finds daylight
+runs with nothing worse than caution; `roofPlan()` turns the run starting
+now into a verdict against `S.roofHours` (GO needs 2 h of margin, CAUTION
+is a fit with less or a run holding cautious hours, NO GO otherwise; the
+15-minute nowcast overrides when rain is inside two hours) and picks the
+best window in the next 72 h. Change a threshold in `roofRisk` and in the
+explainer's rules table together.
 
 Overlays (`#map`, `#alerts`) ride the history stack: `openOverlay()` pushes,
 the back button pops, `route()` reads the hash — so Android's back gesture
