@@ -25,7 +25,7 @@ const ok = (name, cond, detail) => {
 
 /* ---------- fixture: a plausible Open-Meteo answer, pinned to one clock ---------- */
 const NOW = "2026-11-01T09:12";
-const hourly = { time: [], temperature_2m: [], precipitation_probability: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [] };
+const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], relative_humidity_2m: [] };
 for (let i = 0; i < 48; i++) {
   const d = i < 24 ? "2026-11-01" : "2026-11-02", h = i % 24;
   hourly.time.push(d + "T" + String(h).padStart(2, "0") + ":00");
@@ -35,6 +35,10 @@ for (let i = 0; i < 48; i++) {
   hourly.is_day.push(h >= 8 && h < 18 ? 1 : 0);
   hourly.uv_index.push(h >= 10 && h <= 15 ? 4 : 1);
   hourly.pressure_msl.push(1012 + i * 0.6);       // rising 1.8 hPa over three hours
+  hourly.apparent_temperature.push(hourly.temperature_2m[i] - 3);
+  hourly.precipitation.push(h >= 14 && h <= 17 ? 0.05 : 0);
+  hourly.wind_speed_10m.push(8 + (h % 5));
+  hourly.relative_humidity_2m.push(60);
 }
 // 15-minute nowcast: dry for 30 min, then rain for an hour.
 const minutely_15 = { time: [], precipitation: [], snowfall: [] };
@@ -53,6 +57,9 @@ const daily = {
   sunrise: daily_t("07:48"), sunset: daily_t("18:32"),
   precipitation_probability_max: [40, 10, 0, 0, 80, 70, 5, 0, 10, 0],
   precipitation_sum: [0.12, 0, 0, 0, 0.6, 0.3, 0, 0, 0, 0],
+  daylight_duration: DAYS.map((_, i) => 38640 - i * 100),
+  wind_speed_10m_max: [14, 12, 10, 9, 22, 18, 11, 10, 9, 8], wind_gusts_10m_max: [24, 20, 18, 15, 41, 30, 19, 17, 15, 14],
+  uv_index_max: [4, 4, 5, 5, 3, 2, 4, 4, 4, 5],
 };
 function daily_t(hm) { return DAYS.map(d => "2026-11-" + d + "T" + hm); }
 const FORECAST = {
@@ -106,15 +113,17 @@ async function page(opts = {}) {
   p.errors = [];
   p.on("pageerror", e => p.errors.push(String(e)));
   p.on("console", m => { if (m.type() === "error") p.errors.push(m.text()); });
-  await p.route("**/api.open-meteo.com/**", r => { apiCalls++; return apiDown ? r.fulfill({ status: 503, body: "down" }) : r.fulfill({ json: FORECAST }); });
+  await p.route("**/api.open-meteo.com/**", r => { apiCalls++; return apiDown ? r.fulfill({ status: 503, body: "down" })
+    : r.fulfill({ json: opts.noMinutely ? { ...FORECAST, minutely_15: undefined } : FORECAST }); });
   await p.route("**/geocoding-api.open-meteo.com/**", r => r.fulfill({ json: GEO }));
   await p.route("**/api.bigdatacloud.net/**", r => r.fulfill({ json: { city: "Ponca City", principalSubdivisionCode: "US-OK", countryCode: "US" } }));
-  await mockExtras(p);
+  await mockExtras(p, opts.noAlerts);
   return p;
 }
-async function mockExtras(p) {
+async function mockExtras(p, noAlerts) {
+  p.noAlerts = !!noAlerts;
   await p.route("**/air-quality-api.open-meteo.com/**", r => r.fulfill({ json: AIR }));
-  await p.route("**/api.weather.gov/**", r => { alertCalls.push(r.request().url()); return r.fulfill({ json: ALERTS }); });
+  await p.route("**/api.weather.gov/**", r => { alertCalls.push(r.request().url()); return r.fulfill({ json: p.noAlerts ? { features: [] } : ALERTS }); });
   await p.route("**/api.rainviewer.com/**", r => r.fulfill({ json: RADAR_JSON }));
   await p.route("**/tile.openstreetmap.org/**", r => { baseTiles++; return r.fulfill({ contentType: "image/png", body: PNG }); });
   await p.route("**/tilecache.rainviewer.com/**", r => { radarTiles++; return r.fulfill({ contentType: "image/png", body: PNG }); });
@@ -156,15 +165,19 @@ ok("title is the place", (await text(p, "#hTitle")) === "Ponca City");
 ok("hero temp 57°F", (await text(p, "#heroTemp")).replace(/\s/g, "") === "57°F", await text(p, "#heroTemp"));
 ok("condition text", (await text(p, ".hero-cond")) === "Partly cloudy");
 ok("feels/high/low", /Feels 54° · H 63° L 41°/.test(await text(p, ".hero-sub")), await text(p, ".hero-sub"));
-ok("nine tiles", (await p.locator(".tile").count()) === 9);
+ok("nine tiles, all tappable buttons", (await p.locator("button.tile").count()) === 9);
+ok("every tile carries a scale bar", (await p.locator(".tile .m").count()) === 9);
+ok("day summary reads like a sentence", (await text(p, "#heroSum")) === "Partly cloudy now. Rain possible around 2 PM until about 6 PM, high 63°. Tomorrow overcast, 58°.", await text(p, "#heroSum"));
+ok("captions explain the tiles, hours and days", (await p.locator(".legend").count()) >= 4 && /chance of rain that hour/.test(await text(p, "#view")) && /low to its high/.test(await text(p, "#view")));
+ok("no bare dashes anywhere", !/(^|\s)—(\s|$)/.test(await text(p, "#view")));
 ok("wind tile", /9 mph/.test(await text(p, ".tile:nth-child(1) .v")) && /NW · gusts 18$/.test(await text(p, ".tile:nth-child(1) .s")));
 ok("rain tile", (await text(p, ".tile:nth-child(3) .v")) === "40%" && /0.12 in today/.test(await text(p, ".tile:nth-child(3) .s")));
-ok("uv tile reads the current hour", (await text(p, ".tile:nth-child(4) .v")) === "1");
+ok("uv tile reads the current hour, with advice", (await text(p, ".tile:nth-child(4) .v")) === "1" && /Low · no protection needed/.test(await text(p, ".tile:nth-child(4) .s")));
 ok("humidity tile has the dew point", /dew point 44°/.test(await text(p, ".tile:nth-child(2) .s")));
 ok("air tile 42 · Good with PM2.5", (await text(p, ".tile.aq .v")) === "42 · Good" && /PM2.5 9/.test(await text(p, ".tile.aq .s")));
-ok("pressure in inHg, rising", (await text(p, ".tile:nth-child(6) .v")) === "30.07 inHg" && (await text(p, ".tile:nth-child(6) .s")) === "rising");
-ok("visibility 10 mi, cloud cover", (await text(p, ".tile:nth-child(7) .v")) === "10 mi" && /45% cloud/.test(await text(p, ".tile:nth-child(7) .s")));
-ok("sun tile", (await text(p, ".tile:nth-child(8) .v")) === "7:48 AM" && /sets 6:32 PM/.test(await text(p, ".tile:nth-child(8) .s")));
+ok("pressure in inHg, rising · clearing", (await text(p, ".tile:nth-child(6) .v")) === "30.07 inHg" && (await text(p, ".tile:nth-child(6) .s")) === "rising · clearing");
+ok("visibility 10 mi, clear · partly cloudy", (await text(p, ".tile:nth-child(7) .v")) === "10 mi" && (await text(p, ".tile:nth-child(7) .s")) === "Clear · partly cloudy");
+ok("sun tile with day length", (await text(p, ".tile:nth-child(8) .v")) === "7:48 AM" && /sets 6:32 PM · 10h 44m of light/.test(await text(p, ".tile:nth-child(8) .s")), await text(p, ".tile:nth-child(8) .s"));
 ok("moon tile has a phase name", /moon|crescent|quarter|gibbous/i.test(await text(p, ".tile:nth-child(9) .s")));
 ok("nowcast: rain in ~30 min", (await text(p, "#nowcast .t span")) === "Rain in ~30 min", await text(p, "#nowcast .t span"));
 ok("nowcast has 8 bars, 4 wet", (await p.locator(".ncbars i").count()) === 8 && (await p.locator(".ncbars i:not(.dry)").count()) === 4);
@@ -172,12 +185,33 @@ ok("alert banner leads with the tornado warning", (await text(p, ".alertbar b"))
 ok("banner is the first thing in view", await p.locator("#view > :first-child").evaluate(e => e.classList.contains("alertbar")));
 ok("alerts fetched by point", alertCalls.some(u => /alerts\/active\?point=36\.7070%2C-97\.0856/.test(u)), alertCalls.join(" "));
 ok("map button counts the warning area", /1 warning area on the map/.test(await text(p, ".mapbtn small")));
+
+/* ---------- 2b. explainers ---------- */
+console.log("explainers");
+await p.click(".tile.aq"); await p.waitForTimeout(350);
+ok("air explainer opens with the band and a meter", await p.locator("#info").evaluate(e => e.classList.contains("on")) && (await text(p, "#infoT")) === "Air quality" && /Good/.test(await text(p, "#info .ibig")) && (await p.locator("#info .meter").count()) === 1);
+ok("air explainer says what to do and lists pollutants", /clean/.test(await text(p, "#infoB")) && /PM2\.5/.test(await text(p, "#infoB")) && /Ozone/.test(await text(p, "#infoB")));
+await p.click("#infoDone"); await p.waitForTimeout(300);
+ok("done closes it", !(await p.locator("#info").evaluate(e => e.classList.contains("on"))));
+await p.click('[data-info="pressure"]'); await p.waitForTimeout(300);
+ok("pressure explainer explains the trend", /clearing, settled weather/.test(await text(p, "#infoB")) && /\+0\.08 inHg/.test(await text(p, "#infoB")), await text(p, "#infoB"));
+await p.click("#scrim"); await p.waitForTimeout(300);
+await p.click('[data-info="sun"]'); await p.waitForTimeout(300);
+ok("sun explainer counts daylight left", /9 h 20 min of daylight left/.test(await text(p, "#infoB")), await text(p, "#infoB"));
+await p.click("#infoDone"); await p.waitForTimeout(200);
+await p.click(".hr:nth-child(6)"); await p.waitForTimeout(300);
+ok("hour explainer: 2 PM with rain details", (await text(p, "#infoT")) === "2 PM · Today" && /40% · rain possible/.test(await text(p, "#infoB")) && /0\.05 in/.test(await text(p, "#infoB")), await text(p, "#infoT") + " " + await text(p, "#infoB"));
+await p.click("#infoDone"); await p.waitForTimeout(200);
+await p.click(".day:nth-child(5)"); await p.waitForTimeout(300);
+ok("day explainer: Thursday with wind and sun", /Thursday/.test(await text(p, "#infoT")) && /Plan on rain/.test(await text(p, "#infoB")) && /gusts 41 mph/.test(await text(p, "#infoB")), await text(p, "#infoT"));
+await p.click("#infoDone"); await p.waitForTimeout(200);
+ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 ok("24 hourly cells", (await p.locator(".hr").count()) === 24);
 ok("first hourly is Now at 9 AM", (await text(p, ".hr.now .t")) === "Now" && (await text(p, ".hr:nth-child(2) .t")) === "10 AM");
 ok("rain chance shows at 2 PM", (await text(p, ".hr:nth-child(6) .p")) === "40%");
 ok("10 daily rows", (await p.locator(".day").count()) === 10);
 ok("today labelled", (await text(p, ".day:first-child .n")) === "Today");
-ok("days aside names the state", /Oklahoma, US/.test(await text(p, ".sec-label .aside")));
+ok("days aside names the state", /Oklahoma, US/.test(await p.locator(".sec-label .aside").last().innerText()));
 ok("updated just now", /Updated just now/.test(await text(p, "#hSub")), await text(p, "#hSub"));
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 if (process.env.SHOT) await p.screenshot({ path: path.join(process.env.SHOT, "weather-dark.png"), fullPage: true });
@@ -231,7 +265,8 @@ ok("only one frame visible", (await p.locator("#mapRadar .fr:not([hidden])").cou
 ok("state-wide warnings fetched", alertCalls.some(u => /area=OK/.test(u) && /Tornado\+Warning/.test(u)), alertCalls.join(" "));
 ok("tornado polygon drawn", (await p.locator("#mapSvg path.crit").count()) === 1);
 ok("place marker drawn", (await p.locator("#mapSvg .me").count()) === 1);
-ok("legend shows the tornado tone", /Tornado/.test(await text(p, "#mapLegend")));
+ok("legend explains radar and the tornado tone", /Radar: light → heavy/.test(await text(p, "#mapLegend")) && /Tornado/.test(await text(p, "#mapLegend")));
+ok("first-open hint", /Drag to pan/.test(await text(p, "#mapMsg")));
 const radarBefore = radarTiles;
 await p.click("#zin"); await p.waitForTimeout(300);
 ok("zoom in past the radar cap upscales instead of refetching nothing", (await p.evaluate(() => document.querySelector("#mapRadar .fr img").style.width)) === "512px");
@@ -249,6 +284,20 @@ await p.click("#zhome"); await p.waitForTimeout(200);
 ok("home recentres", await p.locator("#mapSvg .me").evaluate(e => Math.abs(+e.getAttribute("cx") - 195) < 2));
 await p.click("#mapOvl [data-back]"); await p.waitForTimeout(300);
 ok("back closes the map", await p.locator("#mapOvl").isHidden());
+ok("no errors", p.errors.length === 0, p.errors.join(" | "));
+await p.context().close();
+
+/* ---------- 3d. a quiet day: no alerts, no minute data — still nothing blank ---------- */
+console.log("quiet day");
+const bare = JSON.parse(JSON.stringify(state));
+{ const ls = bare.origins[0].localStorage.find(x => x.name === "roney-weather-v1"); const S = JSON.parse(ls.value); S.cache = {}; ls.value = JSON.stringify(S); }
+p = await page({ state: bare, noAlerts: true, noMinutely: true });
+await p.goto(BASE); await p.waitForTimeout(600);
+ok("no banner, an all-clear line instead", (await p.locator(".alertbar").count()) === 0 && /No active weather alerts/.test(await text(p, ".allclear")) && /checked just now/.test(await text(p, ".allclear")));
+ok("nowcast explains its absence", /Minute-by-minute rain isn't available here/.test(await text(p, "#nowcast")));
+ok("map button still explains itself", /Past two hours, next half hour/.test(await text(p, ".mapbtn small")));
+await p.click(".mapbtn"); await p.waitForTimeout(800);
+ok("map legend says no warnings in OK", /No warnings in OK right now/.test(await text(p, "#mapLegend")), await text(p, "#mapLegend"));
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 await p.context().close();
 

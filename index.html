@@ -141,7 +141,15 @@ svg{display:block}
 .al .meta{font-size:var(--fs-cap);color:var(--faint);margin-top:10px}
 
 /* ---------- hero ---------- */
-.hero{display:flex;align-items:center;gap:14px;padding:18px 18px 16px}
+.hero{padding:18px 18px 14px}
+.hero-row{display:flex;align-items:center;gap:14px}
+.hero-sum{font-size:var(--fs-label);color:var(--ink);margin-top:12px;line-height:1.5;border-top:1px solid var(--line);padding-top:11px}
+.allclear{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;font-size:var(--fs-label);color:var(--dim);
+  padding:9px 13px;margin-top:11px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+.allclear .dot{width:9px;height:9px;border-radius:50%;background:var(--good);box-shadow:0 0 8px var(--good)}
+.allclear.off .dot{background:var(--faint);box-shadow:none}
+.allclear small{display:block;font-size:var(--fs-micro);color:var(--faint)}
+.legend{font-size:var(--fs-micro);color:var(--faint);margin:7px 10px 0;line-height:1.45;text-align:center}
 .hero-main{flex:1;min-width:0}
 .hero-temp{font-size:68px;font-weight:300;line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
 .hero-temp .deg{font-size:34px;vertical-align:top;color:var(--dim);font-weight:400;margin-left:2px}
@@ -162,11 +170,15 @@ svg{display:block}
 
 /* ---------- tiles ---------- */
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;
-  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);min-width:0}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;text-align:left;font:inherit;color:inherit;
+  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);min-width:0;display:block;width:100%}
+.tile:active{transform:scale(.98)}
+.tile .m{height:3px;border-radius:2px;background:var(--card2);margin-top:9px;position:relative;overflow:hidden}
+.tile .m i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--tone,var(--blue))}
+.tile.good{--tone:var(--good)}
 .tile .k{font-size:var(--fs-micro);font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
 .tile .v{font-size:17.5px;font-weight:600;margin-top:3px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tile .s{font-size:var(--fs-cap);color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .s{font-size:var(--fs-cap);color:var(--faint);margin-top:1px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .tile.aq .v{color:var(--tone)}
 
 /* ---------- map launcher ---------- */
@@ -185,6 +197,8 @@ svg{display:block}
 .hr{flex:none;width:58px;display:flex;flex-direction:column;align-items:center;gap:4px;
   padding:6px 0;border-radius:12px;scroll-snap-align:start;font-variant-numeric:tabular-nums}
 .hr.now{background:var(--blue-soft)}
+.hr,.day{cursor:pointer}
+.hr:active,.day:active{background:var(--card2)}
 .hr .t{font-size:var(--fs-cap);color:var(--dim);font-weight:600}
 .hr.now .t{color:var(--blue)}
 .hr svg{width:30px;height:32px}
@@ -246,6 +260,23 @@ svg{display:block}
 .lrow .rm svg{width:16px;height:16px}
 .empty{color:var(--faint);font-size:var(--fs-cap);text-align:center;padding:14px 0}
 
+/* ---------- the explainer sheet ---------- */
+.ibig{font-size:30px;font-weight:600;letter-spacing:-.02em;margin:2px 0 0;font-variant-numeric:tabular-nums}
+.ibig small{font-size:var(--fs-body);font-weight:600;color:var(--tone,var(--dim));margin-left:8px}
+.meter{height:8px;border-radius:4px;background:var(--card2);position:relative;margin:14px 7px 6px}
+.meter.grad{background:linear-gradient(90deg,var(--good),var(--warn),var(--crit))}
+.meter.cool{background:linear-gradient(90deg,var(--cold),var(--card2) 50%,var(--hot))}
+.meter i{position:absolute;top:-4px;width:16px;height:16px;border-radius:50%;background:var(--tone,var(--blue));
+  border:2.5px solid var(--card-solid);transform:translateX(-50%);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.mlab{display:flex;justify-content:space-between;font-size:var(--fs-micro);color:var(--faint);padding:0 2px}
+.irow{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:var(--fs-body)}
+.irow:last-child{border-bottom:none}
+.irow span:first-child{color:var(--dim)}
+.irow b{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+.ipara{font-size:var(--fs-label);color:var(--dim);line-height:1.5;margin:12px 0 6px}
+.ipara b{color:var(--ink)}
+.isec{font-size:var(--fs-micro);font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.11em;margin:16px 0 4px}
+
 /* ---------- overlays (map, alerts) ---------- */
 .ovl{position:fixed;inset:0;z-index:25;background:var(--ground);display:flex;flex-direction:column;
   max-width:600px;margin:0 auto}
@@ -277,7 +308,9 @@ svg{display:block}
 .maplegend{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:4px;
   background:var(--card-solid);border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:var(--fs-micro);font-weight:700;color:var(--dim)}
 .maplegend span{display:flex;align-items:center;gap:6px}
-.maplegend i{width:12px;height:12px;border-radius:3px;background:var(--tone);opacity:.9}
+.maplegend i{width:12px;height:12px;border-radius:3px;background:var(--tone);opacity:.9;flex:none}
+.maplegend i.grad{width:44px;height:9px;background:linear-gradient(90deg,#8fd97a,#f3e04f,#f29a2e,#e23a2e,#b43fc9)}
+.maplegend .quiet{color:var(--faint);font-weight:600}
 .mapbar{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 12px;
   border-top:1px solid var(--line);background:var(--card);flex:none}
 .mapbar button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card2);display:grid;place-items:center}
@@ -338,6 +371,11 @@ svg{display:block}
     </div>
   </section>
 
+  <section class="sheet" id="info" role="dialog" aria-modal="true" aria-label="Details" aria-hidden="true">
+    <div class="sheet-h"><b id="infoT">Details</b><button class="xbtn" id="infoDone">Done</button></div>
+    <div class="sheet-body" id="infoB"></div>
+  </section>
+
   <!-- Radar & warnings: a hand-rolled slippy map. Base tiles from OpenStreetMap,
        radar frames from Rain Viewer, warning polygons from the NWS. -->
   <section class="ovl" id="mapOvl" hidden aria-label="Radar and warnings">
@@ -377,7 +415,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w5 · storms, air, radar";
+const APP_VERSION = "w6 · nothing blank";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -478,13 +516,44 @@ function aqiBand(v) {
     : v <= 200 ? ["Unhealthy", "crit"] : v <= 300 ? ["Very unhealthy", "crit"] : ["Hazardous", "crit"];
 }
 function locLabel(l) { return [l.admin, l.cc].filter(Boolean).join(", "); }
+// Plain words for the numbers. Every scale the app shows has a sentence behind it.
+function windWord(mph) {
+  return mph < 1 ? "Calm" : mph < 4 ? "Light air" : mph < 8 ? "Light breeze" : mph < 13 ? "Gentle breeze" : mph < 19 ? "Moderate breeze"
+    : mph < 25 ? "Fresh breeze" : mph < 32 ? "Strong breeze" : mph < 39 ? "Near gale" : mph < 47 ? "Gale" : mph < 55 ? "Strong gale" : mph < 64 ? "Storm" : "Violent storm";
+}
+function dewWord(f) {
+  return f < 40 ? "Very dry" : f < 50 ? "Dry and comfortable" : f < 60 ? "Comfortable" : f < 65 ? "A bit sticky" : f < 70 ? "Muggy" : f < 75 ? "Oppressive" : "Miserable";
+}
+function rainWord(pct) { return pct < 20 ? "Rain unlikely" : pct < 50 ? "Rain possible" : pct < 70 ? "Rain likely" : "Expect rain"; }
+function uvAdvice(v) {
+  return v < 3 ? "No sun protection needed for most people." : v < 6 ? "Hat and sunscreen if you're out for a while." : v < 8 ? "Sunscreen, a hat, and shade in the middle of the day."
+    : v < 11 ? "Limit time in the midday sun; skin burns fast." : "Stay out of the midday sun; unprotected skin burns in minutes.";
+}
+function aqiAdvice(v) {
+  return v <= 50 ? "The air is clean. Nothing to think about." : v <= 100 ? "Fine for almost everyone. The unusually sensitive may want to go easier on long outdoor exertion."
+    : v <= 150 ? "People with asthma, heart or lung disease, children and older adults should cut back on long or hard outdoor exertion."
+    : v <= 200 ? "Everyone should reduce prolonged or heavy exertion outdoors; sensitive groups should avoid it."
+    : v <= 300 ? "Avoid outdoor exertion. Sensitive groups should stay indoors." : "Stay indoors with windows closed. This is an emergency level.";
+}
+function visWord(m) { const mi = m / 1609.34; return mi < 0.3 ? "Dense fog" : mi < 1 ? "Fog" : mi < 3 ? "Mist or haze" : mi < 6 ? "Slightly hazy" : "Clear"; }
+function cloudWord(pct) { return pct < 10 ? "clear sky" : pct < 30 ? "mostly clear" : pct < 70 ? "partly cloudy" : pct < 90 ? "mostly cloudy" : "overcast"; }
+function presWord(trend) {
+  return trend === "rising" ? "Rising pressure usually means clearing, settled weather on the way."
+    : trend === "falling" ? "Falling pressure usually means unsettled weather is coming — clouds, wind, rain."
+    : "Steady pressure: no change in the weather pattern is being signalled.";
+}
+function minsBetween(a, b) { return (parseInt(b.slice(11, 13), 10) * 60 + parseInt(b.slice(14, 16), 10)) - (parseInt(a.slice(11, 13), 10) * 60 + parseInt(a.slice(14, 16), 10)); }
+function fmtDur(min) { min = Math.round(min); return Math.floor(min / 60) + " h " + String(min % 60).padStart(2, "0") + " min"; }
+function fmtDate(iso) { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" }); }
+const clamp01 = v => Math.max(0, Math.min(1, v));
 // Moon phase from the mean synodic month — good to a few hours, plenty for a tile.
 function moonPhase(dateIso) {
   const [y, m, d] = dateIso.slice(0, 10).split("-").map(Number);
   const days = (Date.UTC(y, m - 1, d, 12) - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
   const syn = 29.530588853, frac = ((days % syn) + syn) % syn / syn;
   const names = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous", "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
-  return { name: names[Math.round(frac * 8) % 8], illum: Math.round((1 - Math.cos(frac * 2 * Math.PI)) / 2 * 100) };
+  return { name: names[Math.round(frac * 8) % 8], illum: Math.round((1 - Math.cos(frac * 2 * Math.PI)) / 2 * 100),
+    toFull: Math.round(((0.5 - frac + 1) % 1) * syn), toNew: Math.round(((1 - frac) % 1) * syn) };
 }
 
 /* ================= WMO weather codes → words + icon ================= */
@@ -612,14 +681,21 @@ function forecast(c, l) {
       <span class="chev">›</span></button>`;
   }
 
-  h += `<div class="card hero">
+  h += `<div class="card hero"><div class="hero-row">
     <div class="hero-main">
       <div class="hero-temp" id="heroTemp">${U.temp(cur.temperature_2m)}<span class="deg">°${esc(S.unit)}</span></div>
       <div class="hero-cond">${esc(condText)}</div>
       <div class="hero-sub">Feels ${deg(cur.apparent_temperature)} · H ${deg(D.temperature_2m_max[ti])} L ${deg(D.temperature_2m_min[ti])}</div>
     </div>
     <div class="hero-ico">${icon(condIcon, !!cur.is_day)}</div>
-  </div>`;
+  </div><div class="hero-sum" id="heroSum">${esc(daySummary(d, hi, ti))}</div></div>`;
+
+  if (!alerts.length) {
+    h += inUS(l)
+      ? (c.alertsAt ? `<div class="allclear"><span class="dot"></span><span>No active weather alerts<small>National Weather Service · checked ${esc(ago(c.alertsAt))}</small></span></div>`
+                    : `<div class="allclear off"><span class="dot"></span><span>Alerts couldn't be checked<small>The National Weather Service didn't answer — refresh to try again</small></span></div>`)
+      : `<div class="allclear off"><span class="dot"></span><span>No alert coverage here<small>Warnings come from the US National Weather Service, so only US places get them</small></span></div>`;
+  }
 
   h += nowcast(d, cur);
 
@@ -631,20 +707,22 @@ function forecast(c, l) {
   let aqTile;
   if (aq && aq.current && aq.current.us_aqi != null) {
     const [band, tone] = aqiBand(aq.current.us_aqi);
-    aqTile = `<div class="tile aq ${tone}"><div class="k">Air</div><div class="v">${Math.round(aq.current.us_aqi)} · ${esc(band)}</div><div class="s">PM2.5 ${Math.round(aq.current.pm2_5 ?? 0)} · O₃ ${Math.round(aq.current.ozone ?? 0)}</div></div>`;
-  } else aqTile = tile("Air", "—", "no air data");
+    aqTile = tile("Air", Math.round(aq.current.us_aqi) + " · " + band, "PM2.5 " + Math.round(aq.current.pm2_5 ?? 0) + " · O₃ " + Math.round(aq.current.ozone ?? 0), "air", clamp01(aq.current.us_aqi / 300), tone, "aq " + tone);
+  } else aqTile = tile("Air", "Not reported", "no air-quality model covers this spot", "air", null, "", "aq");
+  const pct = Math.round(D.precipitation_probability_max[ti] ?? 0);
+  const uvTone = uvNow == null ? "" : uvNow < 3 ? "good" : uvNow < 6 ? "warn" : uvNow < 8 ? "watch" : "crit";
 
   h += `<div class="tiles">
-    ${tile("Wind", U.wind(cur.wind_speed_10m), compass(cur.wind_direction_10m) + " · gusts " + U.wind(cur.wind_gusts_10m).split(" ")[0])}
-    ${tile("Humidity", Math.round(cur.relative_humidity_2m) + "%", cur.dew_point_2m != null ? "dew point " + deg(cur.dew_point_2m) : "")}
-    ${tile("Rain", Math.round(D.precipitation_probability_max[ti] ?? 0) + "%", U.prec(D.precipitation_sum[ti] || 0) + " today")}
-    ${tile("UV", uvNow == null ? "—" : Math.round(uvNow), uvNow == null ? "" : uvLabel(uvNow))}
+    ${tile("Wind", U.wind(cur.wind_speed_10m), compass(cur.wind_direction_10m) + " · gusts " + U.wind(cur.wind_gusts_10m).split(" ")[0], "wind", clamp01(cur.wind_speed_10m / 60), cur.wind_speed_10m < 19 ? "good" : cur.wind_speed_10m < 39 ? "warn" : "crit")}
+    ${tile("Humidity", Math.round(cur.relative_humidity_2m) + "%", cur.dew_point_2m != null ? "dew point " + deg(cur.dew_point_2m) + " · " + dewWord(cur.dew_point_2m).split(" ")[0].toLowerCase() : "dew point not reported", "humidity", clamp01(cur.relative_humidity_2m / 100), cur.dew_point_2m == null ? "" : cur.dew_point_2m < 60 ? "good" : cur.dew_point_2m < 70 ? "warn" : "crit")}
+    ${tile("Rain", pct + "%", (D.precipitation_sum[ti] > 0 ? U.prec(D.precipitation_sum[ti]) : "none") + " today", "rain", clamp01(pct / 100), pct < 20 ? "good" : pct < 50 ? "warn" : "info")}
+    ${tile("UV", uvNow == null ? "Not reported" : String(Math.round(uvNow)), uvNow == null ? "no UV index for this hour" : uvLabel(uvNow) + (uvNow < 3 ? " · no protection needed" : " · protect skin"), "uv", uvNow == null ? null : clamp01(uvNow / 11), uvTone)}
     ${aqTile}
-    ${tile("Pressure", pNow != null ? U.pres(pNow) : "—", pNow != null ? pTrend : "")}
-    ${tile("Visibility", cur.visibility != null ? U.dist(cur.visibility) : "—", cur.cloud_cover != null ? Math.round(cur.cloud_cover) + "% cloud" : "")}
-    ${tile("Sun", fmtClock(D.sunrise[ti]), "sets " + fmtClock(D.sunset[ti]))}
-    ${tile("Moon", moon.illum + "%", moon.name)}
-  </div>`;
+    ${tile("Pressure", pNow != null ? U.pres(pNow) : "Not reported", pNow != null ? pTrend + (pTrend === "rising" ? " · clearing" : pTrend === "falling" ? " · unsettled" : " · no change") : "no pressure reading", "pressure", pNow == null ? null : clamp01((pNow - 980) / 70), pTrend === "falling" ? "warn" : "good")}
+    ${tile("Visibility", cur.visibility != null ? U.dist(cur.visibility) : "Not reported", (cur.visibility != null ? visWord(cur.visibility) : "") + (cur.cloud_cover != null ? (cur.visibility != null ? " · " : "") + cloudWord(cur.cloud_cover) : ""), "visibility", cur.visibility == null ? null : clamp01(cur.visibility / 16093), cur.visibility == null ? "" : cur.visibility > 9600 ? "good" : cur.visibility > 1600 ? "warn" : "crit")}
+    ${tile("Sun", fmtClock(D.sunrise[ti]), "sets " + fmtClock(D.sunset[ti]) + " · " + fmtDur(minsBetween(D.sunrise[ti], D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light", "sun", clamp01(minsBetween(D.sunrise[ti], cur.time) / Math.max(1, minsBetween(D.sunrise[ti], D.sunset[ti]))), "info")}
+    ${tile("Moon", moon.illum + "% lit", moon.name, "moon", moon.illum / 100, "info")}
+  </div><div class="legend">Tap any tile for what the number means. The thin bar is where it sits on its scale.</div>`;
 
   const mapAlerts = alerts.filter(a => a.geom).length;
   h += `<button class="mapbtn" data-act="map">${RADAR_ICO}<span><b>Radar &amp; warnings</b><small>${mapAlerts ? mapAlerts + " warning area" + (mapAlerts > 1 ? "s" : "") + " on the map" : "Past two hours, next half hour"}</small></span><span class="chev">›</span></button>`;
@@ -654,14 +732,15 @@ function forecast(c, l) {
   for (let i = hi; i < Math.min(hi + 24, H.time.length); i++) {
     const [, k] = wx(H.weather_code[i]);
     const pp = H.precipitation_probability ? H.precipitation_probability[i] : null;
-    hours += `<div class="hr${i === hi ? " now" : ""}">
+    hours += `<div class="hr${i === hi ? " now" : ""}" data-hour="${i}" role="button" tabindex="0">
       <div class="t">${i === hi ? "Now" : esc(fmtHour(H.time[i]))}</div>
       ${icon(k, !!H.is_day[i])}
       <div class="v">${deg(H.temperature_2m[i])}</div>
       <div class="p">${pp != null && pp >= 5 ? Math.round(pp) + "%" : ""}</div>
     </div>`;
   }
-  h += `<div class="sec-label">Next 24 hours</div><div class="card" style="padding-bottom:9px"><div class="hours" id="hours">${hours}</div></div>`;
+  h += `<div class="sec-label">Next 24 hours <span class="aside">tap an hour</span></div><div class="card" style="padding-bottom:9px"><div class="hours" id="hours">${hours}</div></div>
+    <div class="legend">Blue % is the chance of rain that hour, shown from 5%. No number means under 5%.</div>`;
 
   // The days ahead: each day's range drawn against the period's own extremes.
   const lo = Math.min(...D.temperature_2m_min), hiT = Math.max(...D.temperature_2m_max), span = Math.max(hiT - lo, 1);
@@ -670,7 +749,7 @@ function forecast(c, l) {
     const [, k] = wx(D.weather_code[i]);
     const pp = D.precipitation_probability_max ? D.precipitation_probability_max[i] : null;
     const left = (D.temperature_2m_min[i] - lo) / span * 100, w = (D.temperature_2m_max[i] - D.temperature_2m_min[i]) / span * 100;
-    days += `<div class="day">
+    days += `<div class="day" data-day="${i}" role="button" tabindex="0">
       <div class="n">${esc(fmtDay(D.time[i], today))}</div>
       ${icon(k, true)}
       <div class="p">${pp != null && pp >= 5 ? Math.round(pp) + "%" : ""}</div>
@@ -679,23 +758,49 @@ function forecast(c, l) {
         <span class="hi">${deg(D.temperature_2m_max[i])}</span></div>
     </div>`;
   }
-  h += `<div class="sec-label">Next ${D.time.length} days <span class="aside">${esc(locLabel(l))}</span></div><div class="card">${days}</div>`;
+  h += `<div class="sec-label">Next ${D.time.length} days <span class="aside">${esc(locLabel(l))}</span></div><div class="card">${days}</div>
+    <div class="legend">Each bar runs from that day's low to its high, placed against the ${D.time.length}-day range (${deg(lo)} to ${deg(hiT)}). Blue % is the day's peak chance of rain. Tap a day for details.</div>`;
 
   h += `<div class="note">Forecast &amp; air quality by Open-Meteo · ${esc(d.timezone_abbreviation || "")}${inUS(l) ? " · alerts by NWS" : ""} · <button data-act="refresh">Refresh</button><br>${esc(APP_VERSION)}</div>`;
   return h;
 }
-function tile(k, v, s) {
-  return `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+function tile(k, v, s, kind, frac, tone, cls) {
+  return `<button class="tile ${cls || ""} ${tone || ""}" data-info="${kind}" aria-label="${esc(k)}: ${esc(v)}, ${esc(s)}. Tap for details">
+    <div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div>
+    ${frac == null ? "" : `<div class="m"><i style="width:${(frac * 100).toFixed(0)}%"></i></div>`}</button>`;
+}
+// One sentence a person would say at the door: what it's doing, when rain starts
+// or stops today, the high, and a glance at tomorrow.
+function daySummary(d, hi, ti) {
+  const cur = d.current, H = d.hourly, D = d.daily, today = cur.time.slice(0, 10);
+  let s = wx(cur.weather_code)[0] + " now.";
+  let end = H.time.findIndex((t, i) => i > hi && t.slice(0, 10) !== today); if (end < 0) end = H.time.length;
+  const pp = H.precipitation_probability || [];
+  const isWet = i => H.weather_code[i] >= 51 || pp[i] >= 50;
+  let first = -1, last = -1;
+  for (let i = hi; i < end; i++) if (isWet(i)) { if (first < 0) first = i; last = i; }
+  const wet = i => { const c = H.weather_code[i]; return c >= 71 && c <= 77 || c === 85 || c === 86 ? "Snow" : c >= 95 ? "Storms" : "Rain"; };
+  const high = deg(D.temperature_2m_max[ti]);
+  const until = last + 1 < end ? "about " + fmtHour(H.time[last + 1]) : "the evening";
+  if (first < 0) s += " Dry for the rest of the day, high " + high + ".";
+  else if (first === hi) s += " " + wet(first) + " through " + until + ", high " + high + ".";
+  else s += " " + wet(first) + ((pp[first] || 0) >= 50 ? " likely" : " possible") + " around " + fmtHour(H.time[first]) + (last > first ? " until " + until : "") + ", high " + high + ".";
+  if (ti + 1 < D.time.length) {
+    const dt = D.temperature_2m_max[ti + 1] - D.temperature_2m_max[ti];
+    s += " Tomorrow " + wx(D.weather_code[ti + 1])[0].toLowerCase() + (dt <= -5 ? " and cooler, " : dt >= 5 ? " and warmer, " : ", ") + deg(D.temperature_2m_max[ti + 1]) + ".";
+  }
+  return s;
 }
 // The next two hours in 15-minute steps, when the model offers them (North America
 // and Europe). Answers the only question that matters at the door: do I need a coat?
 function nowcast(d, cur) {
   const M = d.minutely_15;
-  if (!M || !M.time || !M.precipitation) return "";
+  const none = `<div class="card nowcast" id="nowcast"><div class="t"><span>Minute-by-minute rain isn't available here</span><small>covers North America &amp; Europe</small></div></div>`;
+  if (!M || !M.time || !M.precipitation) return none;
   const q = cur.time.slice(0, 14) + (Math.floor(parseInt(cur.time.slice(14, 16), 10) / 15) * 15).toString().padStart(2, "0");
   let i = M.time.indexOf(q); if (i < 0) i = 0;
   const slots = M.precipitation.slice(i, i + 8);
-  if (slots.length < 4) return "";
+  if (slots.length < 4) return none;
   const first = slots.findIndex(v => v > 0.004), max = Math.max(...slots, 0.01);
   const snow = M.snowfall ? M.snowfall.slice(i, i + 8).some(v => v > 0) : false;
   const word = snow ? "Snow" : "Rain";
@@ -704,7 +809,8 @@ function nowcast(d, cur) {
     : word + " in ~" + first * 15 + " min";
   const bars = slots.map(v => `<i class="${v > 0.004 ? "" : "dry"}" style="height:${Math.max(6, v / max * 100).toFixed(0)}%"></i>`).join("");
   return `<div class="card nowcast" id="nowcast"><div class="t"><span>${esc(title)}</span><small>${first < 0 ? "" : "up to " + esc(U.prec(max)) + " / 15 min"}</small></div>
-    <div class="ncbars">${bars}</div><div class="nclab"><span>Now</span><span>30 min</span><span>1 h</span><span>2 h</span></div></div>`;
+    <div class="ncbars">${bars}</div><div class="nclab"><span>Now</span><span>30 min</span><span>1 h</span><span>2 h</span></div>
+    <div class="legend" style="margin:6px 0 0">Each bar is 15 minutes; taller means heavier. Grey means dry.</div></div>`;
 }
 
 function renderAlerts() {
@@ -721,6 +827,129 @@ function renderAlerts() {
   </details>`).join("") + `<div class="note">${c && c.alertsAt ? "Checked " + esc(ago(c.alertsAt)) + " · " : ""}<button data-act="refresh">Refresh</button></div>`;
 }
 
+/* ================= the explainer sheet ================= */
+function ctx() {
+  const l = curLoc(), c = cacheFor(l); if (!l || !c || !c.d) return null;
+  const d = c.d, cur = d.current, H = d.hourly, D = d.daily, today = cur.time.slice(0, 10);
+  let ti = D.time.indexOf(today); if (ti < 0) ti = 0;
+  let hi = H.time.indexOf(cur.time.slice(0, 13) + ":00"); if (hi < 0) hi = 0;
+  return { l, c, d, cur, H, D, today, ti, hi, aq: c.aq };
+}
+const irow = (k, v) => `<div class="irow"><span>${esc(k)}</span><b>${esc(v)}</b></div>`;
+const ipara = t => `<div class="ipara">${t}</div>`;
+const ibig = (v, word, tone) => `<div class="ibig ${tone || ""}">${esc(v)}${word ? `<small>${esc(word)}</small>` : ""}</div>`;
+const meter = (frac, lo, hi, cls, tone) => `<div class="meter ${cls || ""} ${tone || ""}"><i style="left:${(clamp01(frac) * 100).toFixed(0)}%"></i></div><div class="mlab"><span>${esc(lo)}</span><span>${esc(hi)}</span></div>`;
+function openInfo(kind, idx) {
+  const x = ctx(); if (!x) return;
+  const { cur, H, D, ti, hi, aq, today } = x;
+  let title = "", b = "";
+  switch (kind) {
+    case "wind": {
+      const w = cur.wind_speed_10m, g = cur.wind_gusts_10m;
+      title = "Wind";
+      b = ibig(U.wind(w), windWord(w)) + meter(w / 60, "Calm", "Storm") +
+        ipara(`Blowing <b>from the ${compass(cur.wind_direction_10m)}</b> at a steady ${U.wind(w)}, with gusts to <b>${U.wind(g)}</b>. ${g >= 40 ? "Gusts this strong can bring down branches and make driving a high-sided vehicle hard." : g >= 25 ? "Enough to make an umbrella useless and blow loose things around the yard." : "Nothing that will get in the way of the day."}`) +
+        irow("Today's strongest", D.wind_speed_10m_max ? U.wind(D.wind_speed_10m_max[ti]) + (D.wind_gusts_10m_max ? ", gusts " + U.wind(D.wind_gusts_10m_max[ti]) : "") : "not reported");
+      break;
+    }
+    case "humidity": {
+      const dp = cur.dew_point_2m, rh = cur.relative_humidity_2m;
+      title = "Humidity";
+      b = ibig(Math.round(rh) + "%", dp == null ? "" : dewWord(dp)) + (dp == null ? "" : meter((dp - 30) / 50, "Dry", "Oppressive")) +
+        ipara(`Relative humidity says how full of water the air is for its temperature. The number that tells you how it <i>feels</i> is the <b>dew point</b>${dp == null ? ", which wasn't reported for this hour." : `: <b>${deg(dp)}</b>. Below 55° feels dry and crisp, 60–65° starts to feel sticky, above 70° is muggy.`}`) +
+        irow("Dew point", dp == null ? "not reported" : deg(dp)) + irow("Feels like", deg(cur.apparent_temperature));
+      break;
+    }
+    case "rain": {
+      const pct = Math.round(D.precipitation_probability_max[ti] ?? 0), tot = D.precipitation_sum[ti] || 0;
+      title = "Rain today";
+      b = ibig(pct + "%", rainWord(pct)) + meter(pct / 100, "Unlikely", "Certain") +
+        ipara(`A <b>${pct}% chance</b> means that in ten days like today, measurable rain would fall on this spot on about ${Math.round(pct / 10)} of them. ${tot > 0 ? `If it comes, expect about <b>${U.prec(tot)}</b>${tot >= 1 ? " — a soaking." : tot >= 0.25 ? " — a decent wetting." : " — not much."}` : "The models put no measurable amount on the ground."}`) +
+        irow("Expected total", tot > 0 ? U.prec(tot) : "none") + irow("Falling right now", cur.precipitation > 0 ? U.prec(cur.precipitation) + " this hour" : "nothing");
+      break;
+    }
+    case "uv": {
+      const uv = H.uv_index ? H.uv_index[hi] : null, mx = D.uv_index_max ? D.uv_index_max[ti] : null;
+      title = "UV index";
+      b = uv == null ? ipara("No UV index was reported for this hour.") :
+        ibig(String(Math.round(uv)), uvLabel(uv)) + meter(uv / 11, "0 Low", "11+ Extreme") +
+        ipara(uvAdvice(uv) + " The index measures the strength of sunburn-producing UV; it peaks around solar noon and is near zero at night.") +
+        irow("Today's peak", mx == null ? "not reported" : Math.round(mx) + " · " + uvLabel(mx));
+      break;
+    }
+    case "air": {
+      title = "Air quality";
+      if (!aq || !aq.current || aq.current.us_aqi == null) { b = ipara("No air-quality model covers this spot, so there's nothing to show. Most of North America and Europe is covered."); break; }
+      const v = aq.current.us_aqi, [band, tone] = aqiBand(v);
+      b = ibig(String(Math.round(v)), band, tone) + meter(v / 300, "0 Good", "300 Hazardous", "grad") +
+        ipara(aqiAdvice(v) + " This is the US EPA Air Quality Index: the worst of the pollutants below sets the number.") +
+        irow("Fine particles PM2.5", Math.round(aq.current.pm2_5 ?? 0) + " µg/m³") + irow("Coarse particles PM10", Math.round(aq.current.pm10 ?? 0) + " µg/m³") +
+        irow("Ozone O₃", Math.round(aq.current.ozone ?? 0) + " µg/m³") + irow("Nitrogen dioxide NO₂", Math.round(aq.current.nitrogen_dioxide ?? 0) + " µg/m³");
+      break;
+    }
+    case "pressure": {
+      const p = cur.pressure_msl, then = H.pressure_msl ? H.pressure_msl[Math.max(0, hi - 3)] : null, dlt = p != null && then != null ? p - then : 0;
+      const trend = dlt > 1 ? "rising" : dlt < -1 ? "falling" : "steady";
+      title = "Pressure";
+      b = p == null ? ipara("No pressure reading for this hour.") :
+        ibig(U.pres(p), trend) + meter((p - 980) / 70, "Stormy", "Fair") +
+        ipara(presWord(trend) + ` Over the last three hours it moved <b>${(dlt >= 0 ? "+" : "") + (S.unit === "F" ? (dlt * 0.02953).toFixed(2) + " inHg" : dlt.toFixed(1) + " hPa")}</b>. Typical readings sit between ${S.unit === "F" ? "29.5 and 30.5 inHg" : "1000 and 1030 hPa"}.`);
+      break;
+    }
+    case "visibility": {
+      const v = cur.visibility, cc = cur.cloud_cover;
+      title = "Visibility & sky";
+      b = (v == null ? ipara("No visibility reading for this hour.") : ibig(U.dist(v), visWord(v)) + meter(v / 16093, "Fog", "Clear")) +
+        ipara(`${v == null ? "" : v < 1600 ? "Fog or heavy precipitation is cutting how far you can see. Slow down on the road and use low beams." : v < 9600 ? "Some haze, mist or precipitation in the air." : "You can see as far as the terrain lets you."} The sky is <b>${cc == null ? "not reported" : Math.round(cc) + "% covered — " + cloudWord(cc)}</b>.`);
+      break;
+    }
+    case "sun": {
+      const rise = D.sunrise[ti], set = D.sunset[ti], len = minsBetween(rise, set), now = minsBetween(rise, cur.time);
+      title = "Sun";
+      b = ibig(fmtDur(len), "of daylight") + meter(now / len, "Sunrise " + fmtClock(rise), "Sunset " + fmtClock(set)) +
+        ipara(now < 0 ? `Sunrise is in <b>${fmtDur(-now)}</b>.` : now < len ? `<b>${fmtDur(len - now)}</b> of daylight left today.` : `The sun set <b>${fmtDur(now - len)}</b> ago.`) +
+        (ti + 1 < D.time.length ? irow("Tomorrow's sunrise", fmtClock(D.sunrise[ti + 1])) + irow("Tomorrow's sunset", fmtClock(D.sunset[ti + 1])) : "") +
+        (D.daylight_duration && ti + 1 < D.time.length ? irow("Day length change", (D.daylight_duration[ti + 1] - D.daylight_duration[ti] >= 0 ? "+" : "−") + Math.round(Math.abs(D.daylight_duration[ti + 1] - D.daylight_duration[ti]) / 60) + " min tomorrow") : "");
+      break;
+    }
+    case "moon": {
+      const m = moonPhase(today);
+      title = "Moon";
+      b = ibig(m.illum + "% lit", m.name) + meter(m.illum / 100, "New", "Full") +
+        ipara(`${m.illum >= 95 ? "Bright nights — the moon lights the yard like a street lamp." : m.illum <= 5 ? "Dark nights — best for stars." : m.name.startsWith("Waxing") ? "Growing brighter each night." : m.name.startsWith("Waning") ? "Shrinking each night." : ""} The phase comes from the moon's position in its 29.5-day cycle.`) +
+        irow("Next full moon", m.toFull === 0 ? "tonight" : "in " + m.toFull + " days") + irow("Next new moon", m.toNew === 0 ? "tonight" : "in " + m.toNew + " days");
+      break;
+    }
+    case "hour": {
+      const i = idx, [cond] = wx(H.weather_code[i]), pp = (H.precipitation_probability || [])[i];
+      title = (i === hi ? "Now" : fmtHour(H.time[i])) + " · " + fmtDay(H.time[i].slice(0, 10), today);
+      b = ibig(deg(H.temperature_2m[i]), cond) +
+        irow("Feels like", H.apparent_temperature ? deg(H.apparent_temperature[i]) : "—") +
+        irow("Chance of rain", pp == null ? "—" : Math.round(pp) + "% · " + rainWord(pp).toLowerCase()) +
+        irow("Amount", H.precipitation ? (H.precipitation[i] > 0 ? U.prec(H.precipitation[i]) : "none") : "—") +
+        irow("Wind", H.wind_speed_10m ? U.wind(H.wind_speed_10m[i]) + " · " + windWord(H.wind_speed_10m[i]).toLowerCase() : "—") +
+        irow("Humidity", H.relative_humidity_2m ? Math.round(H.relative_humidity_2m[i]) + "%" : "—") +
+        irow("UV", H.uv_index ? Math.round(H.uv_index[i]) + " · " + uvLabel(H.uv_index[i]) : "—");
+      break;
+    }
+    case "day": {
+      const i = idx, [cond] = wx(D.weather_code[i]), pp = (D.precipitation_probability_max || [])[i];
+      title = fmtDate(D.time[i]);
+      b = ibig(deg(D.temperature_2m_max[i]) + " / " + deg(D.temperature_2m_min[i]), cond) +
+        ipara(`High ${deg(D.temperature_2m_max[i])}, low ${deg(D.temperature_2m_min[i])}. ${pp >= 50 ? "Plan on rain." : pp >= 20 ? "A shower is possible." : "Looks dry."}${D.uv_index_max && D.uv_index_max[i] >= 6 ? " Strong sun at midday." : ""}`) +
+        irow("Chance of rain", pp == null ? "—" : Math.round(pp) + "%") + irow("Expected total", D.precipitation_sum[i] > 0 ? U.prec(D.precipitation_sum[i]) : "none") +
+        irow("Wind", D.wind_speed_10m_max ? U.wind(D.wind_speed_10m_max[i]) + (D.wind_gusts_10m_max ? ", gusts " + U.wind(D.wind_gusts_10m_max[i]) : "") : "—") +
+        irow("UV peak", D.uv_index_max ? Math.round(D.uv_index_max[i]) + " · " + uvLabel(D.uv_index_max[i]) : "—") +
+        irow("Sunrise · sunset", fmtClock(D.sunrise[i]) + " · " + fmtClock(D.sunset[i])) + irow("Daylight", fmtDur(minsBetween(D.sunrise[i], D.sunset[i])));
+      break;
+    }
+    default: return;
+  }
+  $("infoT").textContent = title; $("infoB").innerHTML = b;
+  $("info").classList.add("on"); $("scrim").classList.add("on"); $("info").setAttribute("aria-hidden", "false");
+}
+function closeInfo() { $("info").classList.remove("on"); $("info").setAttribute("aria-hidden", "true"); if (!$("sheet").classList.contains("on")) $("scrim").classList.remove("on"); }
+
 /* ================= data ================= */
 let BUSY = false;
 function setBusy(b) { BUSY = b; $("refreshBtn").classList.toggle("spin", b); }
@@ -729,9 +958,9 @@ function forecastUrl(l) {
   const p = new URLSearchParams({
     latitude: l.lat, longitude: l.lon, timezone: "auto", forecast_days: "10",
     current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,dew_point_2m,pressure_msl,visibility,cloud_cover",
-    hourly: "temperature_2m,precipitation_probability,weather_code,is_day,uv_index,pressure_msl",
+    hourly: "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,is_day,uv_index,pressure_msl,wind_speed_10m,relative_humidity_2m",
     minutely_15: "precipitation,snowfall",
-    daily: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,precipitation_sum",
+    daily: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,daylight_duration,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max",
     temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch",
   });
   return FORECAST + "?" + p;
@@ -860,7 +1089,7 @@ function openSheet(focusSearch) {
   if (focusSearch) setTimeout(() => $("q").focus(), 280);
 }
 function closeSheet() {
-  $("sheet").classList.remove("on"); $("scrim").classList.remove("on");
+  $("sheet").classList.remove("on"); if (!$("info").classList.contains("on")) $("scrim").classList.remove("on");
   $("sheet").setAttribute("aria-hidden", "true");
   $("q").value = ""; $("results").innerHTML = "";
 }
@@ -957,8 +1186,10 @@ function drawOverlay() {
   svg.innerHTML = s;
   const tones = [...new Set(list.map(a => a.tone))].sort((a, b) => TONE_RANK[a] - TONE_RANK[b]);
   const label = { crit: "Tornado / extreme", warn: "Warning", watch: "Watch", info: "Advisory" };
-  $("mapLegend").innerHTML = tones.map(t => `<span class="${t}"><i></i>${label[t]}</span>`).join("");
-  $("mapLegend").hidden = !tones.length;
+  const st = l ? stateOf(l) : "";
+  $("mapLegend").innerHTML = `<span><i class="grad"></i>Radar: light → heavy</span>` +
+    (tones.length ? tones.map(t => `<span class="${t}"><i></i>${label[t]}</span>`).join("")
+      : `<span class="quiet">${l && inUS(l) ? "No warnings in " + esc(st || "this area") + " right now" : "Warnings: US places only"}</span>`);
 }
 async function loadRadar() {
   if (Date.now() - MAP.radarAt < 5 * 60 * 1000 && MAP.frames.length) { drawMap(); return; }
@@ -973,8 +1204,9 @@ async function loadRadar() {
     for (const f of MAP.frames) { const d = document.createElement("div"); d.className = "fr"; d.dataset.path = f.path; d.hidden = true; box.appendChild(d); }
     $("frameSl").max = String(Math.max(0, MAP.frames.length - 1));
     MAP.fi = Math.max(0, past.length - 1);     // open on the latest observed frame
-    $("mapMsg").hidden = true;
     drawMap(); showFrame(MAP.fi);
+    if (!MAP.hinted) { MAP.hinted = true; $("mapMsg").textContent = "Drag to pan · pinch to zoom · ▶ plays the last 2 hours"; setTimeout(() => { if (/Drag/.test($("mapMsg").textContent)) $("mapMsg").hidden = true; }, 6000); }
+    else $("mapMsg").hidden = true;
   } catch (e) {
     $("mapMsg").hidden = false; $("mapMsg").textContent = "Radar unavailable right now";
     drawMap();
@@ -1094,7 +1326,8 @@ $("themeBtn").addEventListener("click", () => { S.theme = isDark() ? "light" : "
 $("refreshBtn").addEventListener("click", () => refresh(true));
 $("locBtn").addEventListener("click", () => openSheet(false));
 $("sheetDone").addEventListener("click", closeSheet);
-$("scrim").addEventListener("click", closeSheet);
+$("infoDone").addEventListener("click", closeInfo);
+$("scrim").addEventListener("click", () => { closeSheet(); closeInfo(); });
 $("geoBtn").addEventListener("click", useMyLocation);
 $("q").addEventListener("input", e => { clearTimeout(searchT); searchT = setTimeout(() => search(e.target.value), 280); });
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(searchT); search(e.target.value); } });
@@ -1110,6 +1343,9 @@ $("saved").addEventListener("click", e => {
 });
 document.addEventListener("click", e => {
   if (e.target.closest("[data-back]")) { closeOverlay(); return; }
+  const info = e.target.closest("[data-info]"); if (info) { openInfo(info.dataset.info); return; }
+  const hr = e.target.closest("[data-hour]"); if (hr) { openInfo("hour", +hr.dataset.hour); return; }
+  const dy = e.target.closest("[data-day]"); if (dy) { openInfo("day", +dy.dataset.day); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
   if (b.dataset.act === "geo") { openSheet(false); useMyLocation(); }
   else if (b.dataset.act === "search") openSheet(true);
@@ -1117,7 +1353,10 @@ document.addEventListener("click", e => {
   else if (b.dataset.act === "map") openOverlay("map");
   else if (b.dataset.act === "alerts") openOverlay("alerts");
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSheet(); if (location.hash) closeOverlay(); } });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") { closeSheet(); closeInfo(); if (location.hash) closeOverlay(); }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-hour],[data-day]")) { e.preventDefault(); e.target.click(); }
+});
 window.addEventListener("popstate", route);
 window.addEventListener("hashchange", route);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(false); });

@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~95 checks, every network source mocked, ~12s
+node tests/smoke.mjs        # ~113 checks, every network source mocked, ~15s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -29,6 +29,14 @@ theme, saved places, the current index, and a per-place cache
 places). `refresh()` fetches forecast, air quality and NWS point alerts with
 `Promise.allSettled` and keeps the previous copy of any part that fails;
 alerts are only requested for US places (`inUS()`).
+
+**Nothing on screen is blank or unexplained** (w6): every number has words
+(`windWord`, `dewWord`, `aqiAdvice`, …), every tile has a scale bar, and
+`openInfo(kind, idx)` builds the explainer sheet (`#info`) for tiles,
+hours and days from `ctx()`. `daySummary()` writes the hero sentence from
+the hourly codes/probabilities. Keep that bar when adding anything: a
+missing value shows *why* ("Not reported", "no air-quality model covers
+this spot"), never "—"; the suite greps the view for bare dashes.
 
 Overlays (`#map`, `#alerts`) ride the history stack: `openOverlay()` pushes,
 the back button pops, `route()` reads the hash — so Android's back gesture
