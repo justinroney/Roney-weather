@@ -1,6 +1,6 @@
 // Network-first, cache-fallback: fresh app when online, the shell still opens without signal.
 // Bump CACHE with APP_VERSION in index.html on every release — the suite checks they match.
-const CACHE = "weather-w10";
+const CACHE = "weather-w11";
 const ASSETS = ["./", "index.html", "manifest.json", "icons/icon-192.png", "icons/icon-512.png", "icons/maskable-192.png", "icons/maskable-512.png"];
 
 self.addEventListener("install", e => {

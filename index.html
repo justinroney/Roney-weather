@@ -486,7 +486,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w10 · a real timeline";
+const APP_VERSION = "w11 · updates itself";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -1780,8 +1780,22 @@ route();
 refresh(false);
 // Offline shell. Network-first, so a deploy is live on the next open; the
 // forecast itself is cached in localStorage above, not here.
+// An installed app keeps its page alive for days, so a deploy used to sit
+// unseen until a full close. Now: check for a new worker every time the app
+// comes to the foreground, and when one takes over, reload — right away if
+// nothing is open, otherwise on the next return.
 if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" }).then(reg => {
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
+    reg.update().catch(() => {});
+  }).catch(() => {});
+  let hadWorker = !!navigator.serviceWorker.controller, pendingReload = false;
+  const reloadSoon = () => {
+    if (document.hidden || location.hash || $("sheet").classList.contains("on") || $("info").classList.contains("on")) { pendingReload = true; return; }
+    location.reload();
+  };
+  navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadWorker) reloadSoon(); hadWorker = true; });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && pendingReload) reloadSoon(); });
 }
 </script>
 </body>

@@ -91,5 +91,12 @@ service workers in its contexts so the
 mocks always see the requests. Sandboxed sessions usually can't reach the
 real APIs; a real-data check is done on the phone.
 
+**Updates reach the phone on their own** (w11): the page registers the
+worker with `updateViaCache: "none"`, calls `reg.update()` on every return
+to the foreground, and reloads on `controllerchange` when a previous worker
+existed (deferred while a sheet or overlay is open). So a deploy shows up
+on the next foregrounding, not the next full close. Keep this when touching
+the service-worker block.
+
 Editing happens from a phone: suite green before commit, story-style commit
 messages, the deployed version confirmed from the footer of the forecast.
