@@ -3,15 +3,41 @@
 **Live at https://roney-weather.vercel.app** (Vercel deploys `main`).
 
 A personal weather app: one hand-written `index.html`, zero dependencies, no
-build step. Save the places you care about (search a city, or use the phone's
-location), see current conditions, the next 24 hours, and the week ahead; flip
-°F/°C; the last forecast per place stays on the device so the app still
-answers with no signal. Installable as its own app from Chrome (⋮ → Install
-app) or Safari (Share → Add to Home Screen).
+build step. Installable as its own app from Chrome (⋮ → Install app) or
+Safari (Share → Add to Home Screen).
 
-Forecasts and city search come from [Open-Meteo](https://open-meteo.com)
-(free, no key). The phone's location is named via BigDataCloud's free reverse
-geocoder; if that fails the place is simply "My location".
+What it does (w5):
+
+- **Places** — search a city, or use the phone's location. Saved on the
+  device; the last forecast per place is kept so the app answers with no signal.
+- **Severe weather** — active NWS alerts for the place, led by the most
+  urgent (a tornado warning pulses red at the very top), with the full text
+  and the "what to do" instruction one tap away.
+- **Radar & warnings map** — a hand-rolled slippy map: OpenStreetMap base,
+  Rain Viewer radar loop (past two hours + a half-hour nowcast, play/scrub),
+  and every live warning polygon in the state drawn on top (tornado and
+  extreme in red, warnings in amber, watches in orange). Pinch, drag,
+  double-tap, wheel.
+- **Now** — temperature, feels-like, condition, high/low; a 15-minute rain
+  strip for the next two hours ("Rain in ~30 min"); wind and gusts, humidity
+  and dew point, rain chance and total, UV, air quality (US AQI with PM2.5
+  and ozone), pressure and its trend, visibility and cloud cover, sunrise and
+  sunset, moon phase.
+- **Ahead** — 24 hours from the current hour, and 10 days with range bars.
+- °F/°C flips everything on screen without a refetch; light and dark.
+
+Data: forecasts, 15-minute nowcast, air quality and city search from
+[Open-Meteo](https://open-meteo.com); alerts from the
+[National Weather Service](https://www.weather.gov/documentation/services-web-api)
+(US only); radar from [Rain Viewer](https://www.rainviewer.com/api.html)
+(free tier: zoom 7, 100 requests a minute); base map © OpenStreetMap
+contributors; the phone's location is named via BigDataCloud's free reverse
+geocoder. All free, no keys.
+
+Not built, on purpose: push notifications (the phone's own Wireless
+Emergency Alerts already carry tornado warnings), lightning and pollen (no
+free US source). Possible next: NOAA's own higher-resolution radar imagery,
+hurricane tracks from the NHC feeds, storm reports, an hourly detail sheet.
 
 ## Files
 
@@ -20,7 +46,8 @@ geocoder; if that fails the place is simply "My location".
 - `sw.js` — offline shell (network-first). `CACHE` must match `APP_VERSION`.
 - `manifest.json`, `icons/` — the install surface. `icons/icon.svg` is the
   source; the PNGs were rendered from it with headless Chromium.
-- `tests/smoke.mjs` — the suite. Open-Meteo is mocked at the network layer.
+- `tests/smoke.mjs` — the suite (~95 checks). Open-Meteo, NWS, Rain Viewer
+  and the map tiles are all mocked at the network layer.
 
 ## Tests
 

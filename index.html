@@ -11,9 +11,11 @@
 <link rel="apple-touch-icon" href="icons/icon-180.png">
 <style>
 /* Roney Weather — one hand-written file, zero dependencies, same instrument-panel
-   look as the routine app next door. Forecasts come from Open-Meteo (free, no key);
-   the last good forecast per saved place is kept on the device so the app still
-   says something useful with no signal. */
+   look as the routine app. Forecasts and air quality come from Open-Meteo (free,
+   no key), severe-weather warnings from the National Weather Service, radar
+   frames from Rain Viewer, base map tiles from OpenStreetMap. The last good
+   forecast per saved place is kept on the device so the app still says
+   something useful with no signal. */
 :root {
   --ground:#05080F; --glow-top:#132A4A;
   --card:rgba(19,28,45,.72); --card-solid:#131C2D;
@@ -28,6 +30,7 @@
   --edge:inset 0 1px 0 rgba(255,255,255,.11);
   --blur:saturate(150%) blur(14px);
   --r:16px;
+  --tilefilter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.9) saturate(.55);
 }
 @media (prefers-color-scheme:light){
   :root:not([data-theme="dark"]){
@@ -38,7 +41,7 @@
     --good:#16663A; --warn:#7A4E00; --crit:#A32A1A;
     --sun:#D98B00; --rain:#0063AE; --snow:#5A6874; --hot:#C2410C; --cold:#0063AE;
     --shadow:0 1px 2px rgba(31,42,51,.06),0 4px 14px rgba(31,42,51,.05);
-    --edge:none; --blur:none;
+    --edge:none; --blur:none; --tilefilter:none;
   }
 }
 :root[data-theme="light"]{
@@ -49,7 +52,7 @@
   --good:#16663A; --warn:#7A4E00; --crit:#A32A1A;
   --sun:#D98B00; --rain:#0063AE; --snow:#5A6874; --hot:#C2410C; --cold:#0063AE;
   --shadow:0 1px 2px rgba(31,42,51,.06),0 4px 14px rgba(31,42,51,.05);
-  --edge:none; --blur:none;
+  --edge:none; --blur:none; --tilefilter:none;
 }
 :root[data-theme="dark"]{
   --ground:#05080F; --glow-top:#132A4A;
@@ -62,6 +65,7 @@
   --shadow:0 1px 2px rgba(0,0,0,.5),0 10px 30px rgba(0,0,0,.35);
   --edge:inset 0 1px 0 rgba(255,255,255,.11);
   --blur:saturate(150%) blur(14px);
+  --tilefilter:invert(1) hue-rotate(180deg) brightness(.82) contrast(.9) saturate(.55);
 }
 
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -75,9 +79,10 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   opacity:.85}
 #app{max-width:600px;margin:0 auto;padding:0 0 40px}
 button{font-family:var(--sans);color:inherit;cursor:pointer}
-button,.hr,.day,.lrow{user-select:none;-webkit-user-select:none}
+button,.hr,.day,.lrow,.mapz button{user-select:none;-webkit-user-select:none}
 :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
 svg{display:block}
+[hidden]{display:none !important}
 
 /* ---------- header ---------- */
 .hdr{position:sticky;top:0;z-index:20;background:var(--card);
@@ -94,7 +99,7 @@ svg{display:block}
 .hdr-title svg{width:16px;height:16px;flex:none;color:var(--dim)}
 .hdr-sub{text-align:center;font-size:var(--fs-cap);color:var(--dim);margin-top:-2px;min-height:18px}
 .ibtn{background:none;border:none;width:44px;height:44px;display:grid;place-items:center;
-  border-radius:50%;color:var(--dim);font-weight:700;font-size:15px}
+  border-radius:50%;color:var(--dim);font-weight:700;font-size:15px;position:relative}
 .ibtn svg{width:19px;height:19px}
 .ibtn:active{transform:scale(.9)}
 .ibtn.spin svg{animation:spin 1s linear infinite}
@@ -110,7 +115,30 @@ svg{display:block}
   -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
 .card + .card{margin-top:11px}
 .note{font-size:var(--fs-cap);color:var(--faint);text-align:center;margin:18px 8px 0;line-height:1.5}
-.note button{background:none;border:none;color:var(--blue);font-weight:600;font-size:inherit;padding:0 2px}
+.note button,.linkbtn{background:none;border:none;color:var(--blue);font-weight:600;font-size:inherit;padding:0 2px}
+
+/* ---------- alerts ---------- */
+.alertbar{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;width:100%;
+  text-align:left;background:var(--card);border:1px solid var(--line);border-left:5px solid var(--tone);
+  border-radius:14px;padding:11px 12px 11px 13px;margin-bottom:11px;box-shadow:var(--shadow),var(--edge);
+  -webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
+.alertbar .dot{width:12px;height:12px;border-radius:50%;background:var(--tone);box-shadow:0 0 10px var(--tone)}
+.alertbar.crit .dot{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.35}}
+.alertbar b{display:block;font-size:var(--fs-body)}
+.alertbar small{display:block;color:var(--dim);font-size:var(--fs-cap)}
+.alertbar .chev{color:var(--faint);font-size:20px}
+.crit{--tone:var(--crit)} .warn{--tone:var(--warn)} .watch{--tone:var(--hot)} .info{--tone:var(--blue)}
+.al{border-left:4px solid var(--tone);padding-left:12px}
+.al + .al{margin-top:11px}
+.al summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;min-height:44px}
+.al summary::-webkit-details-marker{display:none}
+.al summary b{font-size:var(--fs-body)}
+.al summary small{display:block;color:var(--dim);font-size:var(--fs-cap);margin-top:2px}
+.al summary .sev{font-size:var(--fs-micro);font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--tone)}
+.al .body{font-size:var(--fs-label);color:var(--dim);white-space:pre-wrap;margin-top:8px;line-height:1.5}
+.al .body b{color:var(--ink);display:block;margin:10px 0 2px}
+.al .meta{font-size:var(--fs-cap);color:var(--faint);margin-top:10px}
 
 /* ---------- hero ---------- */
 .hero{display:flex;align-items:center;gap:14px;padding:18px 18px 16px}
@@ -122,13 +150,33 @@ svg{display:block}
 .hero-ico{flex:none;width:112px;height:112px}
 .hero-ico svg{width:100%;height:100%}
 
+/* ---------- next two hours ---------- */
+.nowcast{margin-top:11px;padding:12px 16px 10px}
+.nowcast .t{font-size:var(--fs-label);font-weight:600;display:flex;justify-content:space-between;align-items:baseline}
+.nowcast .t small{color:var(--faint);font-size:var(--fs-micro);font-weight:600}
+.ncbars{display:grid;grid-template-columns:repeat(8,1fr);gap:4px;height:38px;align-items:end;margin-top:8px}
+.ncbars i{display:block;background:var(--rain);border-radius:3px 3px 0 0;min-height:2px;opacity:.9}
+.ncbars i.dry{background:var(--card2);opacity:1}
+.nclab{display:grid;grid-template-columns:repeat(4,1fr);font-size:var(--fs-micro);color:var(--faint);margin-top:4px}
+.nclab span:last-child{text-align:right}
+
 /* ---------- tiles ---------- */
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:11px}
 .tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:11px 12px 10px;
-  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
+  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);min-width:0}
 .tile .k{font-size:var(--fs-micro);font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.09em}
-.tile .v{font-size:19px;font-weight:600;margin-top:3px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.tile .v{font-size:17.5px;font-weight:600;margin-top:3px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tile .s{font-size:var(--fs-cap);color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile.aq .v{color:var(--tone)}
+
+/* ---------- map launcher ---------- */
+.mapbtn{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;margin-top:11px;
+  box-shadow:var(--shadow),var(--edge);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur)}
+.mapbtn svg{width:34px;height:34px;color:var(--blue)}
+.mapbtn b{display:block;font-size:var(--fs-body)}
+.mapbtn small{display:block;color:var(--dim);font-size:var(--fs-cap)}
+.mapbtn .chev{color:var(--faint);font-size:20px}
 
 /* ---------- hourly strip ---------- */
 .hours{display:flex;gap:2px;overflow-x:auto;margin:0 -16px;padding:2px 10px 6px;
@@ -198,6 +246,50 @@ svg{display:block}
 .lrow .rm svg{width:16px;height:16px}
 .empty{color:var(--faint);font-size:var(--fs-cap);text-align:center;padding:14px 0}
 
+/* ---------- overlays (map, alerts) ---------- */
+.ovl{position:fixed;inset:0;z-index:25;background:var(--ground);display:flex;flex-direction:column;
+  max-width:600px;margin:0 auto}
+.ovl-h{display:flex;align-items:center;gap:4px;padding:calc(env(safe-area-inset-top) + 6px) 8px 6px;
+  border-bottom:1px solid var(--line);background:var(--card);flex:none}
+.ovl-h b{flex:1;text-align:center;font-size:17px;letter-spacing:-.01em;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ovl-h .sp{width:84px;flex:none}
+.backbtn{background:none;border:none;color:var(--blue);font-size:15px;font-weight:600;
+  display:inline-flex;align-items:center;gap:2px;min-height:44px;padding:0 10px 0 6px;width:84px}
+.backbtn svg{width:20px;height:20px}
+.ovl-body{flex:1;min-height:0;overflow-y:auto;padding:12px 12px calc(env(safe-area-inset-bottom) + 24px)}
+
+#mapvp{flex:1;min-height:0;position:relative;overflow:hidden;background:#0b1220;touch-action:none;cursor:grab}
+#mapvp:active{cursor:grabbing}
+#mapWrap{position:absolute;inset:0;transform-origin:0 0}
+#mapTiles,#mapRadar,#mapSvg{position:absolute;inset:0}
+#mapTiles{filter:var(--tilefilter)}
+#mapTiles img,#mapRadar img{position:absolute;width:256px;height:256px;pointer-events:none;-webkit-user-drag:none}
+#mapRadar{opacity:.78}
+#mapRadar .fr[hidden]{display:none}
+#mapSvg{width:100%;height:100%;overflow:visible;pointer-events:none}
+#mapSvg path{fill:var(--tone);fill-opacity:.18;stroke:var(--tone);stroke-width:2.5;stroke-linejoin:round}
+#mapSvg .me{fill:var(--blue);stroke:#fff;stroke-width:2.5}
+#mapSvg .mering{fill:var(--blue);fill-opacity:.22}
+.mapz{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.mapz button{width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card-solid);
+  color:var(--ink);font-size:21px;font-weight:600;display:grid;place-items:center;box-shadow:var(--shadow)}
+.mapz button svg{width:20px;height:20px}
+.maplegend{position:absolute;left:10px;top:10px;display:flex;flex-direction:column;gap:4px;
+  background:var(--card-solid);border:1px solid var(--line);border-radius:10px;padding:7px 9px;font-size:var(--fs-micro);font-weight:700;color:var(--dim)}
+.maplegend span{display:flex;align-items:center;gap:6px}
+.maplegend i{width:12px;height:12px;border-radius:3px;background:var(--tone);opacity:.9}
+.mapbar{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 12px;
+  border-top:1px solid var(--line);background:var(--card);flex:none}
+.mapbar button{width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:var(--card2);display:grid;place-items:center}
+.mapbar button svg{width:18px;height:18px}
+.mapbar input[type=range]{width:100%;accent-color:var(--blue)}
+.mapbar .ft{font-size:var(--fs-cap);color:var(--dim);font-variant-numeric:tabular-nums;min-width:76px;text-align:right}
+.mapbar .ft b{color:var(--ink)}
+.mapnote{font-size:10.5px;color:var(--faint);text-align:center;padding:4px 10px calc(env(safe-area-inset-bottom) + 6px);background:var(--card)}
+.mapnote a{color:var(--faint)}
+.mapmsg{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);background:var(--card-solid);border:1px solid var(--line);
+  border-radius:10px;padding:6px 12px;font-size:var(--fs-cap);color:var(--dim);white-space:nowrap}
+
 /* ---------- toast + error bar ---------- */
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 22px);z-index:40;
   transform:translateX(-50%) translateY(8px);background:var(--card-solid);color:var(--ink);
@@ -206,7 +298,6 @@ svg{display:block}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 #errbar{margin:10px 12px 0;padding:10px 12px;border-radius:12px;background:#3a1212;color:#ffd7d7;
   border:1px solid #7a2a2a;font-size:13px;white-space:pre-wrap;word-break:break-word}
-#errbar[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -247,18 +338,61 @@ svg{display:block}
     </div>
   </section>
 
+  <!-- Radar & warnings: a hand-rolled slippy map. Base tiles from OpenStreetMap,
+       radar frames from Rain Viewer, warning polygons from the NWS. -->
+  <section class="ovl" id="mapOvl" hidden aria-label="Radar and warnings">
+    <div class="ovl-h">
+      <button class="backbtn" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Back</button>
+      <b id="mapTitle">Radar</b><span class="sp"></span>
+    </div>
+    <div id="mapvp">
+      <div id="mapWrap"><div id="mapTiles"></div><div id="mapRadar"></div><svg id="mapSvg" aria-hidden="true"></svg></div>
+      <div class="maplegend" id="mapLegend"></div>
+      <div class="mapz">
+        <button id="zin" aria-label="Zoom in">+</button>
+        <button id="zout" aria-label="Zoom out">−</button>
+        <button id="zhome" aria-label="Center on place"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="6"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+      </div>
+      <div class="mapmsg" id="mapMsg" hidden></div>
+    </div>
+    <div class="mapbar">
+      <button id="playBtn" aria-label="Play radar loop"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg></button>
+      <input type="range" id="frameSl" min="0" max="0" value="0" aria-label="Radar frame">
+      <div class="ft" id="frameT">—</div>
+    </div>
+    <div class="mapnote">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors · Weather data by <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">Rain Viewer</a> · Warnings by NWS</div>
+  </section>
+
+  <section class="ovl" id="alertsOvl" hidden aria-label="Active alerts">
+    <div class="ovl-h">
+      <button class="backbtn" data-back><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>Back</button>
+      <b>Alerts</b><span class="sp"></span>
+    </div>
+    <div class="ovl-body" id="alertsBody"></div>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 </div>
 
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w4 · a home of its own";
+const APP_VERSION = "w5 · storms, air, radar";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
+const AIR = "https://air-quality-api.open-meteo.com/v1/air-quality";
 const GEOCODE = "https://geocoding-api.open-meteo.com/v1/search";
 const REVERSE = "https://api.bigdatacloud.net/data/reverse-geocode-client";
+const NWS = "https://api.weather.gov/alerts/active";
+const RADAR = "https://api.rainviewer.com/public/weather-maps.json";
+const OSM = "https://tile.openstreetmap.org";
+const RADAR_MAX_Z = 7;                   // Rain Viewer's free tier stops here; we upscale past it
+// Only warnings and watches someone would act on go on the map. Everything
+// NWS says about the place itself still shows in the alerts list.
+const MAP_EVENTS = ["Tornado Warning", "Severe Thunderstorm Warning", "Flash Flood Warning", "Flash Flood Emergency",
+  "Extreme Wind Warning", "Tornado Watch", "Severe Thunderstorm Watch", "Flood Warning", "Blizzard Warning",
+  "Winter Storm Warning", "Ice Storm Warning", "Hurricane Warning", "Tropical Storm Warning", "Dust Storm Warning"];
 
 const S = load();
 function load() {
@@ -281,6 +415,20 @@ const ckey = l => l.lat.toFixed(3) + "," + l.lon.toFixed(3);
 const cacheFor = l => l ? S.cache[ckey(l)] || null : null;
 const COMPASS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
 const compass = deg => COMPASS[Math.round(((deg % 360) + 360) % 360 / 45) % 8];
+const STATES = { Alabama: "AL", Alaska: "AK", Arizona: "AZ", Arkansas: "AR", California: "CA", Colorado: "CO", Connecticut: "CT",
+  Delaware: "DE", Florida: "FL", Georgia: "GA", Hawaii: "HI", Idaho: "ID", Illinois: "IL", Indiana: "IN", Iowa: "IA", Kansas: "KS",
+  Kentucky: "KY", Louisiana: "LA", Maine: "ME", Maryland: "MD", Massachusetts: "MA", Michigan: "MI", Minnesota: "MN",
+  Mississippi: "MS", Missouri: "MO", Montana: "MT", Nebraska: "NE", Nevada: "NV", "New Hampshire": "NH", "New Jersey": "NJ",
+  "New Mexico": "NM", "New York": "NY", "North Carolina": "NC", "North Dakota": "ND", Ohio: "OH", Oklahoma: "OK", Oregon: "OR",
+  Pennsylvania: "PA", "Rhode Island": "RI", "South Carolina": "SC", "South Dakota": "SD", Tennessee: "TN", Texas: "TX", Utah: "UT",
+  Vermont: "VT", Virginia: "VA", Washington: "WA", "West Virginia": "WV", Wisconsin: "WI", Wyoming: "WY", "District of Columbia": "DC",
+  "Puerto Rico": "PR" };
+// NWS covers the US and its territories; everyone else just doesn't get the alert calls.
+function inUS(l) {
+  if (l.cc) return l.cc === "US" || l.cc === "PR" || l.cc === "GU" || l.cc === "VI";
+  return (l.lat > 24 && l.lat < 50 && l.lon > -125 && l.lon < -66) || (l.lat > 51 && l.lon < -129) || (l.lat > 18 && l.lat < 23 && l.lon < -154);
+}
+function stateOf(l) { return l.state || (STATES[l.admin] || (/^[A-Z]{2}$/.test(l.admin || "") ? l.admin : "")); }
 
 // Everything is fetched in °F / mph / inches and converted on display, so a unit
 // flip never costs a network round trip and the cache stays one shape.
@@ -289,7 +437,10 @@ const U = {
   wind: mph => S.unit === "F" ? Math.round(mph) + " mph" : Math.round(mph * 1.609) + " km/h",
   prec: inch => S.unit === "F"
     ? (inch < 0.005 ? "0" : inch.toFixed(2).replace(/0$/, "")) + " in"
-    : Math.round(inch * 25.4) + " mm",
+    : (inch * 25.4 < 0.05 ? "0" : (inch * 25.4).toFixed(1).replace(/\.0$/, "")) + " mm",
+  dist: m => S.unit === "F" ? (m / 1609.34 >= 9.95 ? "10+" : (m / 1609.34).toFixed(m / 1609.34 < 2 ? 1 : 0)) + " mi"
+                           : (m / 1000 >= 9.95 ? "10+" : (m / 1000).toFixed(m / 1000 < 2 ? 1 : 0)) + " km",
+  pres: hpa => S.unit === "F" ? (hpa * 0.02953).toFixed(2) + " inHg" : Math.round(hpa) + " hPa",
 };
 const deg = f => U.temp(f) + "°";
 
@@ -297,7 +448,7 @@ function fmtHour(iso) {          // "2026-11-01T14:00" -> "2 PM"
   const h = parseInt(iso.slice(11, 13), 10);
   return h === 0 ? "12 AM" : h === 12 ? "12 PM" : h < 12 ? h + " AM" : (h - 12) + " PM";
 }
-function fmtClock(iso) {         // "2026-11-01T07:48" -> "7:48 AM"
+function fmtClock(iso) {         // "2026-11-01T07:48" -> "7:48 AM"  (works on NWS offsets too)
   const h = parseInt(iso.slice(11, 13), 10), m = iso.slice(14, 16);
   return (h % 12 || 12) + ":" + m + (h < 12 ? " AM" : " PM");
 }
@@ -305,6 +456,11 @@ function fmtDay(iso, todayIso) { // "2026-11-01" -> "Today" / "Mon"
   if (iso === todayIso) return "Today";
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: "short" });
+}
+function fmtWhen(iso, todayIso) { // NWS "2026-11-02T18:45:00-06:00" -> "6:45 PM" or "Mon 6:45 PM"
+  if (!iso) return "";
+  const day = iso.slice(0, 10);
+  return (todayIso && day === todayIso ? "" : fmtDay(day, todayIso) + " ") + fmtClock(iso);
 }
 function ago(ms) {
   const m = Math.round((Date.now() - ms) / 60000);
@@ -316,7 +472,20 @@ function ago(ms) {
 function uvLabel(v) {
   return v < 3 ? "Low" : v < 6 ? "Moderate" : v < 8 ? "High" : v < 11 ? "Very high" : "Extreme";
 }
+// US EPA bands; the tone drives the tile colour.
+function aqiBand(v) {
+  return v <= 50 ? ["Good", "good"] : v <= 100 ? ["Moderate", "warn"] : v <= 150 ? ["Unhealthy for sensitive", "watch"]
+    : v <= 200 ? ["Unhealthy", "crit"] : v <= 300 ? ["Very unhealthy", "crit"] : ["Hazardous", "crit"];
+}
 function locLabel(l) { return [l.admin, l.cc].filter(Boolean).join(", "); }
+// Moon phase from the mean synodic month — good to a few hours, plenty for a tile.
+function moonPhase(dateIso) {
+  const [y, m, d] = dateIso.slice(0, 10).split("-").map(Number);
+  const days = (Date.UTC(y, m - 1, d, 12) - Date.UTC(2000, 0, 6, 18, 14)) / 86400000;
+  const syn = 29.530588853, frac = ((days % syn) + syn) % syn / syn;
+  const names = ["New moon", "Waxing crescent", "First quarter", "Waxing gibbous", "Full moon", "Waning gibbous", "Last quarter", "Waning crescent"];
+  return { name: names[Math.round(frac * 8) % 8], illum: Math.round((1 - Math.cos(frac * 2 * Math.PI)) / 2 * 100) };
+}
 
 /* ================= WMO weather codes → words + icon ================= */
 const WMO = {
@@ -373,6 +542,25 @@ function icon(kind, isDay = true) {
   }
   return `<svg viewBox="0 0 24 26" aria-hidden="true">${body}</svg>`;
 }
+const RADAR_ICO = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>`;
+
+/* ================= alerts: tone + ordering ================= */
+function alertTone(ev) {
+  if (/Tornado Warning|Extreme Wind|Flash Flood Emergency|Hurricane Warning/i.test(ev)) return "crit";
+  if (/Warning/i.test(ev)) return "warn";
+  if (/Watch/i.test(ev)) return "watch";
+  return "info";
+}
+const TONE_RANK = { crit: 0, warn: 1, watch: 2, info: 3 };
+// Normalise an NWS feature into the little we keep: everything is external text, esc() at render.
+function normAlert(f) {
+  const p = f.properties || {};
+  return { id: p.id || f.id || "", event: p.event || "Alert", severity: p.severity || "", headline: p.headline || "",
+    description: p.description || "", instruction: p.instruction || "", area: p.areaDesc || "",
+    onset: p.onset || p.effective || "", ends: p.ends || p.expires || "", sender: p.senderName || "",
+    tone: alertTone(p.event || ""), geom: f.geometry && f.geometry.type === "Polygon" ? f.geometry.coordinates : null };
+}
+function sortAlerts(a) { return a.slice().sort((x, y) => TONE_RANK[x.tone] - TONE_RANK[y.tone] || (x.ends || "").localeCompare(y.ends || "")); }
 
 /* ================= rendering ================= */
 function setSub(text) { $("hSub").textContent = text; }
@@ -386,7 +574,7 @@ function render() {
     $("view").innerHTML = onboarding();
     return;
   }
-  if (!c) {
+  if (!c || !c.d) {
     setSub(BUSY ? "Loading…" : "No forecast yet");
     $("view").innerHTML = BUSY ? `<div class="card empty">Fetching the forecast…</div>`
       : `<div class="card onb"><h2>No forecast yet</h2><p>Couldn't reach the weather service. Check the signal and try again.</p><button class="btn pri" data-act="refresh">Try again</button></div>`;
@@ -394,7 +582,8 @@ function render() {
   }
   const stale = Date.now() - c.at > STALE_MS * 6;
   setSub((stale ? "Last forecast " : "Updated ") + ago(c.at) + (navigator.onLine === false ? " · offline" : ""));
-  $("view").innerHTML = forecast(c.d, l);
+  $("view").innerHTML = forecast(c, l);
+  if (!$("alertsOvl").hidden) renderAlerts();
 }
 
 function onboarding() {
@@ -406,15 +595,24 @@ function onboarding() {
   </div>`;
 }
 
-function forecast(d, l) {
-  const cur = d.current, H = d.hourly, D = d.daily;
+function forecast(c, l) {
+  const d = c.d, cur = d.current, H = d.hourly, D = d.daily, aq = c.aq, alerts = sortAlerts(c.alerts || []);
   const [condText, condIcon] = wx(cur.weather_code);
   const today = cur.time.slice(0, 10);
   let ti = D.time.indexOf(today); if (ti < 0) ti = 0;
   let hi = H.time.indexOf(cur.time.slice(0, 13) + ":00"); if (hi < 0) hi = 0;
   const uvNow = H.uv_index ? H.uv_index[hi] : null;
+  let h = "";
 
-  let h = `<div class="card hero">
+  // Warnings first — the one thing that should never be below the fold.
+  if (alerts.length) {
+    const a = alerts[0];
+    h += `<button class="alertbar ${a.tone}" data-act="alerts" aria-label="${esc(a.event)}, see all alerts"><span class="dot"></span>
+      <span><b>${esc(a.event)}</b><small>${a.ends ? "Until " + esc(fmtWhen(a.ends, today)) : esc(a.area)}${alerts.length > 1 ? " · +" + (alerts.length - 1) + " more" : ""}</small></span>
+      <span class="chev">›</span></button>`;
+  }
+
+  h += `<div class="card hero">
     <div class="hero-main">
       <div class="hero-temp" id="heroTemp">${U.temp(cur.temperature_2m)}<span class="deg">°${esc(S.unit)}</span></div>
       <div class="hero-cond">${esc(condText)}</div>
@@ -423,14 +621,33 @@ function forecast(d, l) {
     <div class="hero-ico">${icon(condIcon, !!cur.is_day)}</div>
   </div>`;
 
+  h += nowcast(d, cur);
+
+  // Pressure trend: now vs three hours ago.
+  const pNow = cur.pressure_msl, pThen = H.pressure_msl ? H.pressure_msl[Math.max(0, hi - 3)] : null;
+  const pd = pNow != null && pThen != null ? pNow - pThen : 0;
+  const pTrend = pd > 1 ? "rising" : pd < -1 ? "falling" : "steady";
+  const moon = moonPhase(today);
+  let aqTile;
+  if (aq && aq.current && aq.current.us_aqi != null) {
+    const [band, tone] = aqiBand(aq.current.us_aqi);
+    aqTile = `<div class="tile aq ${tone}"><div class="k">Air</div><div class="v">${Math.round(aq.current.us_aqi)} · ${esc(band)}</div><div class="s">PM2.5 ${Math.round(aq.current.pm2_5 ?? 0)} · O₃ ${Math.round(aq.current.ozone ?? 0)}</div></div>`;
+  } else aqTile = tile("Air", "—", "no air data");
+
   h += `<div class="tiles">
-    ${tile("Wind", U.wind(cur.wind_speed_10m), compass(cur.wind_direction_10m) + " · gusts " + U.wind(cur.wind_gusts_10m))}
-    ${tile("Humidity", Math.round(cur.relative_humidity_2m) + "%", cur.precipitation > 0 ? U.prec(cur.precipitation) + " this hour" : "dry right now")}
+    ${tile("Wind", U.wind(cur.wind_speed_10m), compass(cur.wind_direction_10m) + " · gusts " + U.wind(cur.wind_gusts_10m).split(" ")[0])}
+    ${tile("Humidity", Math.round(cur.relative_humidity_2m) + "%", cur.dew_point_2m != null ? "dew point " + deg(cur.dew_point_2m) : "")}
     ${tile("Rain", Math.round(D.precipitation_probability_max[ti] ?? 0) + "%", U.prec(D.precipitation_sum[ti] || 0) + " today")}
     ${tile("UV", uvNow == null ? "—" : Math.round(uvNow), uvNow == null ? "" : uvLabel(uvNow))}
-    ${tile("Sunrise", fmtClock(D.sunrise[ti]), "")}
-    ${tile("Sunset", fmtClock(D.sunset[ti]), "")}
+    ${aqTile}
+    ${tile("Pressure", pNow != null ? U.pres(pNow) : "—", pNow != null ? pTrend : "")}
+    ${tile("Visibility", cur.visibility != null ? U.dist(cur.visibility) : "—", cur.cloud_cover != null ? Math.round(cur.cloud_cover) + "% cloud" : "")}
+    ${tile("Sun", fmtClock(D.sunrise[ti]), "sets " + fmtClock(D.sunset[ti]))}
+    ${tile("Moon", moon.illum + "%", moon.name)}
   </div>`;
+
+  const mapAlerts = alerts.filter(a => a.geom).length;
+  h += `<button class="mapbtn" data-act="map">${RADAR_ICO}<span><b>Radar &amp; warnings</b><small>${mapAlerts ? mapAlerts + " warning area" + (mapAlerts > 1 ? "s" : "") + " on the map" : "Past two hours, next half hour"}</small></span><span class="chev">›</span></button>`;
 
   // Next 24 hours, starting at the current hour.
   let hours = "";
@@ -446,7 +663,7 @@ function forecast(d, l) {
   }
   h += `<div class="sec-label">Next 24 hours</div><div class="card" style="padding-bottom:9px"><div class="hours" id="hours">${hours}</div></div>`;
 
-  // The week: each day's range drawn against the week's own extremes.
+  // The days ahead: each day's range drawn against the period's own extremes.
   const lo = Math.min(...D.temperature_2m_min), hiT = Math.max(...D.temperature_2m_max), span = Math.max(hiT - lo, 1);
   let days = "";
   for (let i = 0; i < D.time.length; i++) {
@@ -462,13 +679,46 @@ function forecast(d, l) {
         <span class="hi">${deg(D.temperature_2m_max[i])}</span></div>
     </div>`;
   }
-  h += `<div class="sec-label">This week <span class="aside">${esc(locLabel(l))}</span></div><div class="card">${days}</div>`;
+  h += `<div class="sec-label">Next ${D.time.length} days <span class="aside">${esc(locLabel(l))}</span></div><div class="card">${days}</div>`;
 
-  h += `<div class="note">Forecast by Open-Meteo · ${esc(d.timezone_abbreviation || "")} · <button data-act="refresh">Refresh</button><br>${esc(APP_VERSION)}</div>`;
+  h += `<div class="note">Forecast &amp; air quality by Open-Meteo · ${esc(d.timezone_abbreviation || "")}${inUS(l) ? " · alerts by NWS" : ""} · <button data-act="refresh">Refresh</button><br>${esc(APP_VERSION)}</div>`;
   return h;
 }
 function tile(k, v, s) {
   return `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="s">${esc(s)}</div></div>`;
+}
+// The next two hours in 15-minute steps, when the model offers them (North America
+// and Europe). Answers the only question that matters at the door: do I need a coat?
+function nowcast(d, cur) {
+  const M = d.minutely_15;
+  if (!M || !M.time || !M.precipitation) return "";
+  const q = cur.time.slice(0, 14) + (Math.floor(parseInt(cur.time.slice(14, 16), 10) / 15) * 15).toString().padStart(2, "0");
+  let i = M.time.indexOf(q); if (i < 0) i = 0;
+  const slots = M.precipitation.slice(i, i + 8);
+  if (slots.length < 4) return "";
+  const first = slots.findIndex(v => v > 0.004), max = Math.max(...slots, 0.01);
+  const snow = M.snowfall ? M.snowfall.slice(i, i + 8).some(v => v > 0) : false;
+  const word = snow ? "Snow" : "Rain";
+  const title = first < 0 ? "Dry for the next 2 hours"
+    : first === 0 ? word + " now" + (slots.findIndex((v, k) => k > 0 && v <= 0.004) > 0 ? ", easing in ~" + slots.findIndex((v, k) => k > 0 && v <= 0.004) * 15 + " min" : "")
+    : word + " in ~" + first * 15 + " min";
+  const bars = slots.map(v => `<i class="${v > 0.004 ? "" : "dry"}" style="height:${Math.max(6, v / max * 100).toFixed(0)}%"></i>`).join("");
+  return `<div class="card nowcast" id="nowcast"><div class="t"><span>${esc(title)}</span><small>${first < 0 ? "" : "up to " + esc(U.prec(max)) + " / 15 min"}</small></div>
+    <div class="ncbars">${bars}</div><div class="nclab"><span>Now</span><span>30 min</span><span>1 h</span><span>2 h</span></div></div>`;
+}
+
+function renderAlerts() {
+  const l = curLoc(), c = cacheFor(l), alerts = sortAlerts(c && c.alerts || []);
+  const today = c && c.d ? c.d.current.time.slice(0, 10) : "";
+  const box = $("alertsBody");
+  if (!l) { box.innerHTML = `<div class="card empty">Pick a place first</div>`; return; }
+  if (!inUS(l)) { box.innerHTML = `<div class="card empty">Alerts come from the US National Weather Service, so they only cover US places.</div>`; return; }
+  if (!alerts.length) { box.innerHTML = `<div class="card empty">No active alerts for ${esc(l.name)}${c && c.alertsAt ? " · checked " + esc(ago(c.alertsAt)) : ""}</div>`; return; }
+  box.innerHTML = alerts.map((a, i) => `<details class="card al ${a.tone}"${i === 0 ? " open" : ""}>
+    <summary><span><b>${esc(a.event)}</b><small>${a.ends ? "Until " + esc(fmtWhen(a.ends, today)) : ""}${a.ends && a.area ? " · " : ""}${esc(a.area)}</small></span><span class="sev">${esc(a.severity)}</span></summary>
+    <div class="body">${esc(a.headline)}${a.description ? "\n\n" + esc(a.description) : ""}${a.instruction ? "<b>What to do</b>" + esc(a.instruction) : ""}</div>
+    <div class="meta">${esc(a.sender)}${a.onset ? " · from " + esc(fmtWhen(a.onset, today)) : ""}</div>
+  </details>`).join("") + `<div class="note">${c && c.alertsAt ? "Checked " + esc(ago(c.alertsAt)) + " · " : ""}<button data-act="refresh">Refresh</button></div>`;
 }
 
 /* ================= data ================= */
@@ -477,34 +727,58 @@ function setBusy(b) { BUSY = b; $("refreshBtn").classList.toggle("spin", b); }
 
 function forecastUrl(l) {
   const p = new URLSearchParams({
-    latitude: l.lat, longitude: l.lon, timezone: "auto", forecast_days: "7",
-    current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m",
-    hourly: "temperature_2m,precipitation_probability,weather_code,is_day,uv_index",
+    latitude: l.lat, longitude: l.lon, timezone: "auto", forecast_days: "10",
+    current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,dew_point_2m,pressure_msl,visibility,cloud_cover",
+    hourly: "temperature_2m,precipitation_probability,weather_code,is_day,uv_index,pressure_msl",
+    minutely_15: "precipitation,snowfall",
     daily: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,precipitation_probability_max,precipitation_sum",
     temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch",
   });
   return FORECAST + "?" + p;
+}
+function airUrl(l) {
+  return AIR + "?" + new URLSearchParams({ latitude: l.lat, longitude: l.lon, timezone: "auto",
+    current: "us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide", forecast_days: "1" });
+}
+function alertsUrl(l) {
+  return NWS + "?" + new URLSearchParams({ point: l.lat.toFixed(4) + "," + l.lon.toFixed(4), status: "actual", message_type: "alert,update" });
+}
+async function getJson(url) {
+  const r = await fetch(url, { headers: { Accept: "application/geo+json, application/json" } });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const j = await r.json();
+  if (j && j.error) throw new Error(j.reason || "service error");
+  return j;
 }
 
 async function refresh(force) {
   const l = curLoc();
   if (!l) { render(); return; }
   const c = cacheFor(l);
-  if (c && !force && Date.now() - c.at < STALE_MS) { render(); return; }
+  if (c && c.d && !force && Date.now() - c.at < STALE_MS) { render(); return; }
   setBusy(true); render();
-  try {
-    const r = await fetch(forecastUrl(l));
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const d = await r.json();
-    if (d.error) throw new Error(d.reason || "weather service error");
-    if (!d.current || !d.hourly || !d.daily) throw new Error("unexpected response");
-    S.cache[ckey(l)] = { at: Date.now(), d };
-    pruneCache(); save();
-  } catch (e) {
-    toast(c ? "Couldn't refresh — showing the last forecast" : "Couldn't load the forecast");
-  } finally {
-    setBusy(false); render();
+  const us = inUS(l);
+  const [fc, aq, al] = await Promise.allSettled([
+    getJson(forecastUrl(l)),
+    getJson(airUrl(l)),
+    us ? getJson(alertsUrl(l)) : Promise.resolve(null),
+  ]);
+  const k = ckey(l), prev = S.cache[k] || {};
+  const next = { at: prev.at || 0, d: prev.d, aq: prev.aq, alerts: prev.alerts, alertsAt: prev.alertsAt };
+  let failed = 0;
+  if (fc.status === "fulfilled" && fc.value.current && fc.value.hourly && fc.value.daily) { next.d = fc.value; next.at = Date.now(); }
+  else failed++;
+  if (aq.status === "fulfilled" && aq.value) next.aq = aq.value;
+  if (us) {
+    if (al.status === "fulfilled" && al.value && Array.isArray(al.value.features)) {
+      next.alerts = al.value.features.map(normAlert); next.alertsAt = Date.now();
+    } else failed++;
   }
+  if (next.d) { S.cache[k] = next; pruneCache(); save(); }
+  if (fc.status !== "fulfilled") toast(c && c.d ? "Couldn't refresh — showing the last forecast" : "Couldn't load the forecast");
+  else if (failed) toast("Forecast updated; alerts didn't come through");
+  setBusy(false); render();
+  if (!$("mapOvl").hidden) drawOverlay();
 }
 function pruneCache() {
   const keep = new Set(S.locs.map(ckey));
@@ -530,7 +804,7 @@ async function useMyLocation() {
     const pos = await new Promise((res, rej) =>
       navigator.geolocation.getCurrentPosition(res, rej, { timeout: 12000, maximumAge: 300000 }));
     const lat = pos.coords.latitude, lon = pos.coords.longitude;
-    let name = "My location", admin = "", cc = "";
+    let name = "My location", admin = "", cc = "", state = "";
     try {
       const r = await fetch(REVERSE + "?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=en");
       if (r.ok) {
@@ -538,9 +812,10 @@ async function useMyLocation() {
         name = g.city || g.locality || g.principalSubdivision || name;
         admin = g.principalSubdivisionCode ? g.principalSubdivisionCode.replace(/^.*-/, "") : (g.principalSubdivision || "");
         cc = g.countryCode || "";
+        state = cc === "US" && /^[A-Z]{2}$/.test(admin) ? admin : "";
       }
     } catch (e) { /* the forecast doesn't need a name */ }
-    addLoc({ name, admin, cc, lat, lon, mine: true });
+    addLoc({ name, admin, cc, state, lat, lon, mine: true });
   } catch (e) {
     toast(e && e.code === 1 ? "Location access was denied" : "Couldn't get your location");
   } finally {
@@ -590,6 +865,215 @@ function closeSheet() {
   $("q").value = ""; $("results").innerHTML = "";
 }
 
+/* ================= overlays: #map and #alerts ride the history stack ================= */
+function openOverlay(name) { history.pushState({ ovl: name }, "", "#" + name); route(); }
+function closeOverlay() { if (history.state && history.state.ovl) history.back(); else { history.replaceState(null, "", location.pathname); route(); } }
+function route() {
+  const h = location.hash.replace("#", "");
+  const map = h === "map", al = h === "alerts";
+  $("mapOvl").hidden = !map; $("alertsOvl").hidden = !al;
+  document.body.style.overflow = map || al ? "hidden" : "";
+  if (al) renderAlerts();
+  if (map) openMap(); else stopLoop();
+}
+
+/* ================= the map ================= */
+// Web Mercator in pixels at an integer zoom; tiles are 256 px.
+const TILE = 256;
+function proj(lat, lon, z) {
+  const n = TILE * Math.pow(2, z), s = Math.sin(lat * Math.PI / 180);
+  return [(lon + 180) / 360 * n, (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * n];
+}
+function unproj(x, y, z) {
+  const n = TILE * Math.pow(2, z), k = Math.PI - 2 * Math.PI * y / n;
+  return [180 / Math.PI * Math.atan(0.5 * (Math.exp(k) - Math.exp(-k))), x / n * 360 - 180];
+}
+const MAP = { lat: 0, lon: 0, z: 7, frames: [], host: "", fi: 0, timer: 0, loc: null, radarAt: 0, areaAlerts: null, areaAt: 0 };
+let TILES_SEEN = 0; // the suite counts these
+
+function openMap() {
+  const l = curLoc();
+  if (!l) { closeOverlay(); return; }
+  if (MAP.loc !== ckey(l)) { MAP.loc = ckey(l); MAP.lat = l.lat; MAP.lon = l.lon; MAP.z = 7; }
+  $("mapTitle").textContent = "Radar · " + l.name;
+  drawMap();
+  loadRadar();
+  loadAreaAlerts(l);
+}
+function mapSize() { const r = $("mapvp").getBoundingClientRect(); return [Math.max(r.width, 1), Math.max(r.height, 1)]; }
+function origin() { const [W, H] = mapSize(); const [cx, cy] = proj(MAP.lat, MAP.lon, MAP.z); return [cx - W / 2, cy - H / 2, W, H]; }
+
+// Place/refresh the <img> tiles of one layer for the current view. Existing
+// elements are moved, not recreated, so panning doesn't refetch.
+function layTiles(layer, urlFor, zCap) {
+  const [ox, oy, W, H] = origin();
+  const z = Math.min(MAP.z, zCap), f = Math.pow(2, MAP.z - z), size = TILE * f, n = Math.pow(2, z);
+  const x0 = Math.floor(ox / size), x1 = Math.floor((ox + W) / size), y0 = Math.max(0, Math.floor(oy / size)), y1 = Math.min(n - 1, Math.floor((oy + H) / size));
+  const keep = new Set();
+  for (let tx = x0; tx <= x1; tx++) for (let ty = y0; ty <= y1; ty++) {
+    const wx = ((tx % n) + n) % n, key = z + "/" + wx + "/" + ty + "@" + tx;
+    keep.add(key);
+    let img = layer.querySelector(`[data-k="${key}"]`);
+    if (!img) {
+      img = document.createElement("img"); img.dataset.k = key; img.alt = ""; img.decoding = "async";
+      img.src = urlFor(z, wx, ty); layer.appendChild(img); TILES_SEEN++;
+    }
+    img.style.left = (tx * size - ox) + "px"; img.style.top = (ty * size - oy) + "px";
+    img.style.width = img.style.height = size + "px";
+  }
+  for (const el of layer.querySelectorAll("img")) if (!keep.has(el.dataset.k)) el.remove();
+}
+function drawMap() {
+  $("mapWrap").style.transform = "";
+  layTiles($("mapTiles"), (z, x, y) => `${OSM}/${z}/${x}/${y}.png`, 19);
+  const fr = $("mapRadar").children;
+  for (let i = 0; i < fr.length; i++) {
+    const path = fr[i].dataset.path;
+    layTiles(fr[i], (z, x, y) => `${MAP.host}${path}/${TILE}/${z}/${x}/${y}/4/1_1.png`, RADAR_MAX_Z);
+  }
+  drawOverlay();
+}
+// Warning polygons + the place marker, in SVG so they stay crisp at any zoom.
+function drawOverlay() {
+  const [ox, oy] = origin(), svg = $("mapSvg");
+  const l = curLoc(), c = cacheFor(l);
+  const seen = new Set(), list = [];
+  for (const a of [...(MAP.areaAlerts || []), ...(c && c.alerts || [])]) {
+    if (!a.geom || seen.has(a.id)) continue; seen.add(a.id); list.push(a);
+  }
+  list.sort((a, b) => TONE_RANK[b.tone] - TONE_RANK[a.tone]); // most urgent drawn last, on top
+  let s = "";
+  for (const a of list) {
+    let d = "";
+    for (const ring of a.geom) {
+      d += ring.map(([lon, lat], i) => { const [x, y] = proj(lat, lon, MAP.z); return (i ? "L" : "M") + (x - ox).toFixed(1) + " " + (y - oy).toFixed(1); }).join("") + "Z";
+    }
+    s += `<path class="${a.tone}" d="${d}"><title>${esc(a.event)}</title></path>`;
+  }
+  if (l) {
+    const [x, y] = proj(l.lat, l.lon, MAP.z);
+    s += `<circle class="mering" cx="${(x - ox).toFixed(1)}" cy="${(y - oy).toFixed(1)}" r="16"/><circle class="me" cx="${(x - ox).toFixed(1)}" cy="${(y - oy).toFixed(1)}" r="6"/>`;
+  }
+  svg.innerHTML = s;
+  const tones = [...new Set(list.map(a => a.tone))].sort((a, b) => TONE_RANK[a] - TONE_RANK[b]);
+  const label = { crit: "Tornado / extreme", warn: "Warning", watch: "Watch", info: "Advisory" };
+  $("mapLegend").innerHTML = tones.map(t => `<span class="${t}"><i></i>${label[t]}</span>`).join("");
+  $("mapLegend").hidden = !tones.length;
+}
+async function loadRadar() {
+  if (Date.now() - MAP.radarAt < 5 * 60 * 1000 && MAP.frames.length) { drawMap(); return; }
+  $("mapMsg").hidden = false; $("mapMsg").textContent = "Loading radar…";
+  try {
+    const j = await getJson(RADAR);
+    const past = (j.radar && j.radar.past || []).slice(-8), now = j.radar && j.radar.nowcast || [];
+    MAP.host = j.host || "https://tilecache.rainviewer.com";
+    MAP.frames = past.concat(now).map(f => ({ time: f.time, path: f.path, future: now.includes(f) }));
+    MAP.radarAt = Date.now();
+    const box = $("mapRadar"); box.innerHTML = "";
+    for (const f of MAP.frames) { const d = document.createElement("div"); d.className = "fr"; d.dataset.path = f.path; d.hidden = true; box.appendChild(d); }
+    $("frameSl").max = String(Math.max(0, MAP.frames.length - 1));
+    MAP.fi = Math.max(0, past.length - 1);     // open on the latest observed frame
+    $("mapMsg").hidden = true;
+    drawMap(); showFrame(MAP.fi);
+  } catch (e) {
+    $("mapMsg").hidden = false; $("mapMsg").textContent = "Radar unavailable right now";
+    drawMap();
+  }
+}
+async function loadAreaAlerts(l) {
+  const st = stateOf(l);
+  if (!inUS(l) || !st) return;
+  if (MAP.areaAlerts && MAP.areaState === st && Date.now() - MAP.areaAt < 3 * 60 * 1000) return;
+  try {
+    const j = await getJson(NWS + "?" + new URLSearchParams({ area: st, status: "actual", message_type: "alert,update", event: MAP_EVENTS.join(",") }));
+    MAP.areaAlerts = (j.features || []).map(normAlert).filter(a => a.geom); MAP.areaState = st; MAP.areaAt = Date.now();
+    drawOverlay();
+  } catch (e) { /* the point alerts still draw */ }
+}
+function showFrame(i) {
+  if (!MAP.frames.length) { $("frameT").textContent = "—"; return; }
+  MAP.fi = Math.max(0, Math.min(i, MAP.frames.length - 1));
+  const fr = $("mapRadar").children;
+  for (let k = 0; k < fr.length; k++) fr[k].hidden = k !== MAP.fi;
+  $("frameSl").value = String(MAP.fi);
+  const f = MAP.frames[MAP.fi];
+  const t = new Date(f.time * 1000).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  $("frameT").innerHTML = (f.future ? "<b>+" + Math.round((f.time - MAP.frames.filter(x => !x.future).slice(-1)[0].time) / 60) + " min</b> " : "") + esc(t);
+}
+function startLoop() {
+  stopLoop();
+  $("playBtn").innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>`;
+  $("playBtn").setAttribute("aria-label", "Pause radar loop");
+  MAP.timer = setInterval(() => {
+    if (!MAP.frames.length) return;
+    showFrame((MAP.fi + 1) % MAP.frames.length);
+  }, MAP.fi === MAP.frames.length - 1 ? 1400 : 600);
+}
+function stopLoop() {
+  if (MAP.timer) clearInterval(MAP.timer); MAP.timer = 0;
+  $("playBtn").innerHTML = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l13 8-13 8z"/></svg>`;
+  $("playBtn").setAttribute("aria-label", "Play radar loop");
+}
+function zoomTo(z, px, py) {           // keep the point under (px,py) fixed
+  z = Math.max(3, Math.min(12, z));
+  if (z === MAP.z) return;
+  const [ox, oy, W, H] = origin();
+  const [lat, lon] = unproj(ox + (px ?? W / 2), oy + (py ?? H / 2), MAP.z);
+  const [nx, ny] = proj(lat, lon, z);
+  const [clat, clon] = unproj(nx - ((px ?? W / 2) - W / 2), ny - ((py ?? H / 2) - H / 2), z);
+  MAP.z = z; MAP.lat = clat; MAP.lon = clon;
+  drawMap();
+}
+// Touch: one finger pans, two pinch (scaled with a CSS transform, committed to
+// an integer zoom on release), wheel zooms about the cursor.
+(function wireMap() {
+  const vp = $("mapvp"), ptrs = new Map();
+  let pinch = null, lastTap = 0;
+  vp.addEventListener("pointerdown", e => {
+    if (e.target.closest("button")) return;
+    vp.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptrs.size === 2) {
+      const [a, b] = [...ptrs.values()], r = vp.getBoundingClientRect();
+      pinch = { d0: Math.hypot(a[0] - b[0], a[1] - b[1]), mx: (a[0] + b[0]) / 2 - r.left, my: (a[1] + b[1]) / 2 - r.top, s: 1 };
+    } else if (ptrs.size === 1) {
+      const now = Date.now(), r = vp.getBoundingClientRect();
+      if (now - lastTap < 300) { zoomTo(MAP.z + 1, e.clientX - r.left, e.clientY - r.top); lastTap = 0; } else lastTap = now;
+    }
+  });
+  vp.addEventListener("pointermove", e => {
+    if (!ptrs.has(e.pointerId)) return;
+    const prev = ptrs.get(e.pointerId); ptrs.set(e.pointerId, [e.clientX, e.clientY]);
+    if (ptrs.size === 1 && !pinch) {
+      const [ox, oy, W, H] = origin();
+      const [lat, lon] = unproj(ox + W / 2 - (e.clientX - prev[0]), oy + H / 2 - (e.clientY - prev[1]), MAP.z);
+      MAP.lat = Math.max(-80, Math.min(80, lat)); MAP.lon = lon;
+      drawMap();
+    } else if (ptrs.size === 2 && pinch) {
+      const [a, b] = [...ptrs.values()];
+      pinch.s = Math.hypot(a[0] - b[0], a[1] - b[1]) / pinch.d0;
+      $("mapWrap").style.transformOrigin = pinch.mx + "px " + pinch.my + "px";
+      $("mapWrap").style.transform = "scale(" + pinch.s + ")";
+    }
+  });
+  const up = e => {
+    ptrs.delete(e.pointerId);
+    if (pinch && ptrs.size < 2) {
+      const dz = Math.round(Math.log2(pinch.s)), p = pinch; pinch = null;
+      $("mapWrap").style.transform = "";
+      if (dz) zoomTo(MAP.z + dz, p.mx, p.my); else drawMap();
+      ptrs.clear();
+    }
+  };
+  vp.addEventListener("pointerup", up); vp.addEventListener("pointercancel", up);
+  vp.addEventListener("wheel", e => { e.preventDefault(); const r = vp.getBoundingClientRect(); zoomTo(MAP.z + (e.deltaY < 0 ? 1 : -1), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+  $("zin").addEventListener("click", () => zoomTo(MAP.z + 1));
+  $("zout").addEventListener("click", () => zoomTo(MAP.z - 1));
+  $("zhome").addEventListener("click", () => { const l = curLoc(); if (l) { MAP.lat = l.lat; MAP.lon = l.lon; drawMap(); } });
+  $("playBtn").addEventListener("click", () => MAP.timer ? stopLoop() : startLoop());
+  $("frameSl").addEventListener("input", e => { stopLoop(); showFrame(+e.target.value); });
+  window.addEventListener("resize", () => { if (!$("mapOvl").hidden) drawMap(); });
+})();
+
 /* ================= theme + toast ================= */
 function applyTheme() {
   if (S.theme) document.documentElement.setAttribute("data-theme", S.theme);
@@ -624,16 +1108,21 @@ $("saved").addEventListener("click", e => {
   const sel = e.target.closest("[data-sel]");
   if (sel) { S.cur = +sel.dataset.sel; save(); closeSheet(); render(); refresh(false); }
 });
-$("view").addEventListener("click", e => {
+document.addEventListener("click", e => {
+  if (e.target.closest("[data-back]")) { closeOverlay(); return; }
   const b = e.target.closest("[data-act]"); if (!b) return;
   if (b.dataset.act === "geo") { openSheet(false); useMyLocation(); }
   else if (b.dataset.act === "search") openSheet(true);
   else if (b.dataset.act === "refresh") refresh(true);
+  else if (b.dataset.act === "map") openOverlay("map");
+  else if (b.dataset.act === "alerts") openOverlay("alerts");
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheet(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { closeSheet(); if (location.hash) closeOverlay(); } });
+window.addEventListener("popstate", route);
+window.addEventListener("hashchange", route);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(false); });
 window.addEventListener("online", () => refresh(false));
-setInterval(() => { if (curLoc() && cacheFor(curLoc())) render(); }, 60000); // keeps "updated N min ago" honest
+setInterval(() => { if (curLoc() && cacheFor(curLoc()) && $("mapOvl").hidden) render(); }, 60000); // keeps "updated N min ago" honest
 
 // Own small parachute: a render failure should say so on screen, not go blank.
 window.addEventListener("error", e => {
@@ -643,7 +1132,9 @@ window.addEventListener("error", e => {
 });
 
 applyTheme();
+if (location.hash) history.replaceState(null, "", location.pathname); // overlays never survive a reload
 render();
+route();
 refresh(false);
 // Offline shell. Network-first, so a deploy is live on the next open; the
 // forecast itself is cached in localStorage above, not here.

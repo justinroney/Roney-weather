@@ -25,7 +25,7 @@ const ok = (name, cond, detail) => {
 
 /* ---------- fixture: a plausible Open-Meteo answer, pinned to one clock ---------- */
 const NOW = "2026-11-01T09:12";
-const hourly = { time: [], temperature_2m: [], precipitation_probability: [], weather_code: [], is_day: [], uv_index: [] };
+const hourly = { time: [], temperature_2m: [], precipitation_probability: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [] };
 for (let i = 0; i < 48; i++) {
   const d = i < 24 ? "2026-11-01" : "2026-11-02", h = i % 24;
   hourly.time.push(d + "T" + String(h).padStart(2, "0") + ":00");
@@ -34,23 +34,50 @@ for (let i = 0; i < 48; i++) {
   hourly.weather_code.push(h >= 14 && h <= 17 ? 61 : h < 10 ? 2 : 1);
   hourly.is_day.push(h >= 8 && h < 18 ? 1 : 0);
   hourly.uv_index.push(h >= 10 && h <= 15 ? 4 : 1);
+  hourly.pressure_msl.push(1012 + i * 0.6);       // rising 1.8 hPa over three hours
 }
+// 15-minute nowcast: dry for 30 min, then rain for an hour.
+const minutely_15 = { time: [], precipitation: [], snowfall: [] };
+for (let i = 0; i < 16; i++) {
+  const mins = 9 * 60 + i * 15;
+  minutely_15.time.push("2026-11-01T" + String(Math.floor(mins / 60)).padStart(2, "0") + ":" + String(mins % 60).padStart(2, "0"));
+  minutely_15.precipitation.push(i >= 2 && i < 6 ? 0.04 * (i - 1) : 0);
+  minutely_15.snowfall.push(0);
+}
+const DAYS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"];
 const daily = {
-  time: ["2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07"],
-  weather_code: [61, 3, 1, 0, 95, 71, 2],
-  temperature_2m_max: [62.6, 58, 61, 66, 59, 41, 47],
-  temperature_2m_min: [41.2, 39, 37, 44, 46, 28, 30],
+  time: DAYS.map(d => "2026-11-" + d),
+  weather_code: [61, 3, 1, 0, 95, 71, 2, 2, 3, 0],
+  temperature_2m_max: [62.6, 58, 61, 66, 59, 41, 47, 50, 54, 57],
+  temperature_2m_min: [41.2, 39, 37, 44, 46, 28, 30, 31, 35, 38],
   sunrise: daily_t("07:48"), sunset: daily_t("18:32"),
-  precipitation_probability_max: [40, 10, 0, 0, 80, 70, 5],
-  precipitation_sum: [0.12, 0, 0, 0, 0.6, 0.3, 0],
+  precipitation_probability_max: [40, 10, 0, 0, 80, 70, 5, 0, 10, 0],
+  precipitation_sum: [0.12, 0, 0, 0, 0.6, 0.3, 0, 0, 0, 0],
 };
-function daily_t(hm) { return ["01", "02", "03", "04", "05", "06", "07"].map(d => "2026-11-" + d + "T" + hm); }
+function daily_t(hm) { return DAYS.map(d => "2026-11-" + d + "T" + hm); }
 const FORECAST = {
   latitude: 36.7, longitude: -97.08, timezone: "America/Chicago", timezone_abbreviation: "CST",
   current: { time: NOW, temperature_2m: 57.4, relative_humidity_2m: 61, apparent_temperature: 54.1, is_day: 1,
-    precipitation: 0, weather_code: 2, wind_speed_10m: 9.3, wind_gusts_10m: 18.1, wind_direction_10m: 320 },
-  hourly, daily,
+    precipitation: 0, weather_code: 2, wind_speed_10m: 9.3, wind_gusts_10m: 18.1, wind_direction_10m: 320,
+    dew_point_2m: 44.2, pressure_msl: 1018.4, visibility: 16000, cloud_cover: 45 },
+  hourly, daily, minutely_15,
 };
+const AIR = { current: { time: NOW, us_aqi: 42, pm2_5: 9.4, pm10: 14, ozone: 61, nitrogen_dioxide: 8 } };
+// One tornado warning covering the point (with a polygon) and one advisory without geometry.
+const POLY = [[[-97.3, 36.5], [-96.8, 36.5], [-96.8, 36.95], [-97.3, 36.95], [-97.3, 36.5]]];
+const ALERTS = { features: [
+  { id: "urn:a1", geometry: null, properties: { id: "urn:a1", event: "Wind Advisory", severity: "Minor", headline: "Wind Advisory until 6 PM",
+    description: "Winds 25 to 35 mph.", instruction: "Secure loose objects.", areaDesc: "Kay County", onset: "2026-11-01T06:00:00-05:00", ends: "2026-11-01T18:00:00-05:00", senderName: "NWS Norman OK" } },
+  { id: "urn:t1", geometry: { type: "Polygon", coordinates: POLY }, properties: { id: "urn:t1", event: "Tornado Warning", severity: "Extreme",
+    headline: "Tornado Warning issued November 1 at 9:02AM CDT until November 1 at 9:45AM CDT by NWS Norman OK",
+    description: "At 902 AM CDT, a severe thunderstorm capable of producing a tornado was located near Ponca City, moving northeast at 35 mph.",
+    instruction: "TAKE COVER NOW! Move to a basement or an interior room on the lowest floor of a sturdy building.",
+    areaDesc: "Kay, OK", onset: "2026-11-01T09:02:00-05:00", ends: "2026-11-01T09:45:00-05:00", senderName: "NWS Norman OK" } },
+] };
+const RADAR_JSON = { version: "2.0", generated: 1793525000, host: "https://tilecache.rainviewer.com",
+  radar: { past: [...Array(12)].map((_, i) => ({ time: 1793520000 + i * 600, path: "/v2/radar/hash" + i })),
+           nowcast: [0, 1, 2].map(i => ({ time: 1793527200 + i * 600, path: "/v2/radar/nowcast" + i })) } };
+const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
 const GEO = { results: [
   { name: "Ponca City", latitude: 36.707, longitude: -97.0856, country_code: "US", admin1: "Oklahoma" },
   { name: "Ponca", latitude: 42.5633, longitude: -96.7056, country_code: "US", admin1: "Nebraska" },
@@ -71,7 +98,7 @@ await new Promise(r => server.listen(0, r));
 const BASE = "http://localhost:" + server.address().port + "/";
 
 const browser = await chromium.launch(process.env.PW_EXEC ? { executablePath: process.env.PW_EXEC } : {});
-let apiCalls = 0, apiDown = false;
+let apiCalls = 0, apiDown = false, alertCalls = [], baseTiles = 0, radarTiles = 0;
 async function page(opts = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: opts.scheme || "dark",
     storageState: opts.state, serviceWorkers: "block" });
@@ -82,7 +109,15 @@ async function page(opts = {}) {
   await p.route("**/api.open-meteo.com/**", r => { apiCalls++; return apiDown ? r.fulfill({ status: 503, body: "down" }) : r.fulfill({ json: FORECAST }); });
   await p.route("**/geocoding-api.open-meteo.com/**", r => r.fulfill({ json: GEO }));
   await p.route("**/api.bigdatacloud.net/**", r => r.fulfill({ json: { city: "Ponca City", principalSubdivisionCode: "US-OK", countryCode: "US" } }));
+  await mockExtras(p);
   return p;
+}
+async function mockExtras(p) {
+  await p.route("**/air-quality-api.open-meteo.com/**", r => r.fulfill({ json: AIR }));
+  await p.route("**/api.weather.gov/**", r => { alertCalls.push(r.request().url()); return r.fulfill({ json: ALERTS }); });
+  await p.route("**/api.rainviewer.com/**", r => r.fulfill({ json: RADAR_JSON }));
+  await p.route("**/tile.openstreetmap.org/**", r => { baseTiles++; return r.fulfill({ contentType: "image/png", body: PNG }); });
+  await p.route("**/tilecache.rainviewer.com/**", r => { radarTiles++; return r.fulfill({ contentType: "image/png", body: PNG }); });
 }
 const text = (p, sel) => p.locator(sel).first().innerText();
 
@@ -121,17 +156,28 @@ ok("title is the place", (await text(p, "#hTitle")) === "Ponca City");
 ok("hero temp 57°F", (await text(p, "#heroTemp")).replace(/\s/g, "") === "57°F", await text(p, "#heroTemp"));
 ok("condition text", (await text(p, ".hero-cond")) === "Partly cloudy");
 ok("feels/high/low", /Feels 54° · H 63° L 41°/.test(await text(p, ".hero-sub")), await text(p, ".hero-sub"));
-ok("six tiles", (await p.locator(".tile").count()) === 6);
-ok("wind tile", /9 mph/.test(await text(p, ".tile:nth-child(1) .v")) && /NW · gusts 18 mph/.test(await text(p, ".tile:nth-child(1) .s")));
+ok("nine tiles", (await p.locator(".tile").count()) === 9);
+ok("wind tile", /9 mph/.test(await text(p, ".tile:nth-child(1) .v")) && /NW · gusts 18$/.test(await text(p, ".tile:nth-child(1) .s")));
 ok("rain tile", (await text(p, ".tile:nth-child(3) .v")) === "40%" && /0.12 in today/.test(await text(p, ".tile:nth-child(3) .s")));
 ok("uv tile reads the current hour", (await text(p, ".tile:nth-child(4) .v")) === "1");
-ok("sunrise/sunset", (await text(p, ".tile:nth-child(5) .v")) === "7:48 AM" && (await text(p, ".tile:nth-child(6) .v")) === "6:32 PM");
+ok("humidity tile has the dew point", /dew point 44°/.test(await text(p, ".tile:nth-child(2) .s")));
+ok("air tile 42 · Good with PM2.5", (await text(p, ".tile.aq .v")) === "42 · Good" && /PM2.5 9/.test(await text(p, ".tile.aq .s")));
+ok("pressure in inHg, rising", (await text(p, ".tile:nth-child(6) .v")) === "30.07 inHg" && (await text(p, ".tile:nth-child(6) .s")) === "rising");
+ok("visibility 10 mi, cloud cover", (await text(p, ".tile:nth-child(7) .v")) === "10 mi" && /45% cloud/.test(await text(p, ".tile:nth-child(7) .s")));
+ok("sun tile", (await text(p, ".tile:nth-child(8) .v")) === "7:48 AM" && /sets 6:32 PM/.test(await text(p, ".tile:nth-child(8) .s")));
+ok("moon tile has a phase name", /moon|crescent|quarter|gibbous/i.test(await text(p, ".tile:nth-child(9) .s")));
+ok("nowcast: rain in ~30 min", (await text(p, "#nowcast .t span")) === "Rain in ~30 min", await text(p, "#nowcast .t span"));
+ok("nowcast has 8 bars, 4 wet", (await p.locator(".ncbars i").count()) === 8 && (await p.locator(".ncbars i:not(.dry)").count()) === 4);
+ok("alert banner leads with the tornado warning", (await text(p, ".alertbar b")) === "Tornado Warning" && /Until 9:45 AM · \+1 more/.test(await text(p, ".alertbar small")), await text(p, ".alertbar small"));
+ok("banner is the first thing in view", await p.locator("#view > :first-child").evaluate(e => e.classList.contains("alertbar")));
+ok("alerts fetched by point", alertCalls.some(u => /alerts\/active\?point=36\.7070%2C-97\.0856/.test(u)), alertCalls.join(" "));
+ok("map button counts the warning area", /1 warning area on the map/.test(await text(p, ".mapbtn small")));
 ok("24 hourly cells", (await p.locator(".hr").count()) === 24);
 ok("first hourly is Now at 9 AM", (await text(p, ".hr.now .t")) === "Now" && (await text(p, ".hr:nth-child(2) .t")) === "10 AM");
 ok("rain chance shows at 2 PM", (await text(p, ".hr:nth-child(6) .p")) === "40%");
-ok("7 daily rows", (await p.locator(".day").count()) === 7);
+ok("10 daily rows", (await p.locator(".day").count()) === 10);
 ok("today labelled", (await text(p, ".day:first-child .n")) === "Today");
-ok("week aside names the state", /Oklahoma, US/.test(await text(p, ".sec-label .aside")));
+ok("days aside names the state", /Oklahoma, US/.test(await text(p, ".sec-label .aside")));
 ok("updated just now", /Updated just now/.test(await text(p, "#hSub")), await text(p, "#hSub"));
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 if (process.env.SHOT) await p.screenshot({ path: path.join(process.env.SHOT, "weather-dark.png"), fullPage: true });
@@ -142,6 +188,8 @@ await p.click("#unitBtn"); await p.waitForTimeout(200);
 ok("hero flips to 14°C", (await text(p, "#heroTemp")).replace(/\s/g, "") === "14°C", await text(p, "#heroTemp"));
 ok("wind flips to km/h", /15 km\/h/.test(await text(p, ".tile:nth-child(1) .v")));
 ok("rain flips to mm", /3 mm today/.test(await text(p, ".tile:nth-child(3) .s")));
+ok("pressure flips to hPa", (await text(p, ".tile:nth-child(6) .v")) === "1018 hPa");
+ok("visibility flips to km", (await text(p, ".tile:nth-child(7) .v")) === "10+ km");
 ok("no refetch on unit flip", apiCalls === 1);
 await p.click("#unitBtn"); await p.waitForTimeout(100);
 await p.click("#themeBtn"); await p.waitForTimeout(200);
@@ -151,6 +199,57 @@ await p.click("#themeBtn"); await p.waitForTimeout(100);
 ok("theme toggles back to dark", (await p.evaluate(() => document.documentElement.dataset.theme)) === "dark");
 const state = await p.context().storageState();
 ok("state persisted", JSON.parse(state.origins[0].localStorage.find(x => x.name === "roney-weather-v1").value).locs.length === 1);
+await p.context().close();
+
+/* ---------- 3b. the alerts screen ---------- */
+console.log("alerts");
+p = await page({ state });
+await p.goto(BASE); await p.waitForTimeout(500);
+await p.click(".alertbar"); await p.waitForTimeout(300);
+ok("alerts overlay opens on #alerts", !(await p.locator("#alertsOvl").isHidden()) && (await p.evaluate(() => location.hash)) === "#alerts");
+ok("two alerts, tornado first and open", (await p.locator("#alertsBody details").count()) === 2
+  && (await text(p, "#alertsBody details:first-child summary b")) === "Tornado Warning"
+  && await p.locator("#alertsBody details:first-child").evaluate(e => e.open));
+ok("instruction shown under What to do", /TAKE COVER NOW/.test(await text(p, "#alertsBody details:first-child .body")));
+ok("severity label", (await p.locator("#alertsBody details:first-child .sev").textContent()) === "Extreme");
+ok("advisory without geometry still listed", (await text(p, "#alertsBody details:nth-child(2) summary b")) === "Wind Advisory");
+await p.click("#alertsOvl [data-back]"); await p.waitForTimeout(300);
+ok("back closes the overlay and clears the hash", await p.locator("#alertsOvl").isHidden() && (await p.evaluate(() => location.hash)) === "");
+ok("no errors", p.errors.length === 0, p.errors.join(" | "));
+
+/* ---------- 3c. the radar map ---------- */
+console.log("radar map");
+baseTiles = 0; radarTiles = 0; alertCalls = [];
+await p.click(".mapbtn"); await p.waitForTimeout(900);
+ok("map overlay opens on #map", !(await p.locator("#mapOvl").isHidden()) && (await p.evaluate(() => location.hash)) === "#map");
+ok("title names the place", (await text(p, "#mapTitle")) === "Radar · Ponca City");
+ok("base tiles requested", baseTiles > 0, String(baseTiles));
+ok("radar tiles requested", radarTiles > 0, String(radarTiles));
+ok("11 frames: 8 past + 3 nowcast", (await p.locator("#mapRadar .fr").count()) === 11 && (await p.locator("#frameSl").getAttribute("max")) === "10");
+ok("opens on the latest observed frame", (await p.locator("#frameSl").inputValue()) === "7" && !/\+/.test(await text(p, "#frameT")));
+ok("only one frame visible", (await p.locator("#mapRadar .fr:not([hidden])").count()) === 1);
+ok("state-wide warnings fetched", alertCalls.some(u => /area=OK/.test(u) && /Tornado\+Warning/.test(u)), alertCalls.join(" "));
+ok("tornado polygon drawn", (await p.locator("#mapSvg path.crit").count()) === 1);
+ok("place marker drawn", (await p.locator("#mapSvg .me").count()) === 1);
+ok("legend shows the tornado tone", /Tornado/.test(await text(p, "#mapLegend")));
+const radarBefore = radarTiles;
+await p.click("#zin"); await p.waitForTimeout(300);
+ok("zoom in past the radar cap upscales instead of refetching nothing", (await p.evaluate(() => document.querySelector("#mapRadar .fr img").style.width)) === "512px");
+ok("zoom keeps the marker on screen", await p.locator("#mapSvg .me").evaluate((e, W) => { const x = +e.getAttribute("cx"); return x > 0 && x < W; }, 390));
+await p.click("#playBtn"); await p.waitForTimeout(1500);
+ok("play advances frames", (await p.locator("#frameSl").inputValue()) !== "7");
+ok("pause button while playing", (await p.locator("#playBtn").getAttribute("aria-label")) === "Pause radar loop");
+await p.click("#playBtn");
+await p.locator("#frameSl").fill("10"); await p.locator("#frameSl").dispatchEvent("input"); await p.waitForTimeout(100);
+ok("last frame is the +30 min nowcast", /\+30 min/.test(await text(p, "#frameT")), await text(p, "#frameT"));
+if (process.env.SHOT) await p.screenshot({ path: path.join(process.env.SHOT, "weather-map.png") });
+await p.mouse.move(195, 400); await p.mouse.down(); await p.mouse.move(255, 430, { steps: 4 }); await p.mouse.up(); await p.waitForTimeout(200);
+ok("drag pans the map", await p.locator("#mapSvg .me").evaluate(e => Math.abs(+e.getAttribute("cx") - 195) > 30));
+await p.click("#zhome"); await p.waitForTimeout(200);
+ok("home recentres", await p.locator("#mapSvg .me").evaluate(e => Math.abs(+e.getAttribute("cx") - 195) < 2));
+await p.click("#mapOvl [data-back]"); await p.waitForTimeout(300);
+ok("back closes the map", await p.locator("#mapOvl").isHidden());
+ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 await p.context().close();
 
 /* ---------- 4. cached forecast survives the API going dark ---------- */
@@ -179,6 +278,7 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, ge
 p = await ctx.newPage(); p.errors = []; p.on("pageerror", e => p.errors.push(String(e)));
 await p.route("**/api.open-meteo.com/**", r => r.fulfill({ json: FORECAST }));
 await p.route("**/api.bigdatacloud.net/**", r => r.fulfill({ json: { city: "Ponca City", principalSubdivisionCode: "US-OK", countryCode: "US" } }));
+await mockExtras(p);
 await p.goto(BASE); await p.waitForTimeout(300);
 await p.click('[data-act="geo"]'); await p.waitForTimeout(900);
 ok("reverse-geocoded name", (await text(p, "#hTitle")) === "Ponca City", await text(p, "#hTitle"));

@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~50 checks, Open-Meteo mocked, ~6s
+node tests/smoke.mjs        # ~95 checks, every network source mocked, ~12s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -24,8 +24,19 @@ suite fails if they differ. Never open a PR unless asked.
 ## Architecture
 
 State is one localStorage object (`roney-weather-v1`, `schema: 1`): unit,
-theme, saved places, the current index, and a per-place cache of the last
-good forecast (`{at, d}` keyed by rounded lat,lon; pruned to saved places).
+theme, saved places, the current index, and a per-place cache
+(`{at, d, aq, alerts, alertsAt}` keyed by rounded lat,lon; pruned to saved
+places). `refresh()` fetches forecast, air quality and NWS point alerts with
+`Promise.allSettled` and keeps the previous copy of any part that fails;
+alerts are only requested for US places (`inUS()`).
+
+Overlays (`#map`, `#alerts`) ride the history stack: `openOverlay()` pushes,
+the back button pops, `route()` reads the hash — so Android's back gesture
+closes them. The map is hand-rolled (`proj`/`unproj` Web Mercator, `layTiles`
+moves existing `<img>` tiles rather than recreating them, radar tiles stop at
+Rain Viewer's zoom 7 and are upscaled past it, warning polygons are SVG).
+State-wide warnings for the map come from a second NWS call (`area=XX`,
+filtered to `MAP_EVENTS`); the state code comes from `stateOf()`.
 Everything is fetched once in °F/mph/inch and converted on display, so a unit
 flip never refetches. Open-Meteo returns local wall-clock times with
 `timezone=auto`; the app formats those strings directly and never converts
@@ -33,8 +44,9 @@ them through `Date` (the phone's zone may differ from the place's). Hourly
 starts at the hour of `current.time`; today's row is matched by date.
 `esc()` every piece of data before it lands in an HTML fragment.
 
-The suite mocks `api.open-meteo.com`, `geocoding-api.open-meteo.com` and
-`api.bigdatacloud.net`, and blocks service workers in its contexts so the
+The suite mocks Open-Meteo (forecast, air, geocoding), `api.weather.gov`,
+`api.rainviewer.com`, both tile hosts, and `api.bigdatacloud.net`, and blocks
+service workers in its contexts so the
 mocks always see the requests. Sandboxed sessions usually can't reach the
 real APIs; a real-data check is done on the phone.
 
