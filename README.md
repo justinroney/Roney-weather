@@ -6,7 +6,7 @@ A personal weather app: one hand-written `index.html`, zero dependencies, no
 build step. Installable as its own app from Chrome (⋮ → Install app) or
 Safari (Share → Add to Home Screen).
 
-What it does (w7):
+What it does (w8):
 
 - **Places** — search a city, or use the phone's location. Saved on the
   device; the last forecast per place is kept so the app answers with no signal.
@@ -29,7 +29,13 @@ What it does (w7):
   risk, the factors (rain, storms, wind, temperature, daylight), a setting
   for how many hours the crew needs from tear-off to underlayment, and the
   best window in the next three days. The 15-minute nowcast overrides
-  everything when rain is minutes away. Thresholds are in the explainer.
+  everything when rain is minutes away. The thresholds follow the published
+  rules — OSHA's high-wind definition (29 CFR 1926.968: 30 mph with material
+  handling), the OSHA/NOAA lightning 30/30 rule, OSHA's proposed heat
+  triggers (80° and 90° heat index), the shingle makers' 40° minimum (GAF,
+  Owens Corning, ARMA), and the wet-surface lessons of the NIOSH and
+  Washington FACE roofer fatality reports — and the explainer lists each
+  rule with its source and links to all fourteen.
 - **Ahead** — 24 hours from the current hour, and 10 days with range bars.
 - **Nothing blank, everything explained** — a one-sentence day summary in
   the hero ("Rain possible around 2 PM until about 6 PM, high 63°. Tomorrow
@@ -62,7 +68,8 @@ hurricane tracks from the NHC feeds, storm reports, an hourly detail sheet.
 - `sw.js` — offline shell (network-first). `CACHE` must match `APP_VERSION`.
 - `manifest.json`, `icons/` — the install surface. `icons/icon.svg` is the
   source; the PNGs were rendered from it with headless Chromium.
-- `tests/smoke.mjs` — the suite (~123 checks). Open-Meteo, NWS, Rain Viewer
+- `tests/smoke.mjs` — the suite (~146 checks, including every roofing
+  threshold against its published value). Open-Meteo, NWS, Rain Viewer
   and the map tiles are all mocked at the network layer.
 
 ## Tests

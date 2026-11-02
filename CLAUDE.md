@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~123 checks, every network source mocked, ~16s
+node tests/smoke.mjs        # ~146 checks, every network source mocked, ~17s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -38,10 +38,18 @@ the hourly codes/probabilities. Keep that bar when adding anything: a
 missing value shows *why* ("Not reported", "no air-quality model covers
 this spot"), never "—"; the suite greps the view for bare dashes.
 
-**Roofing window** (w7): `roofRisk(H, i)` grades each hour 0 fine / 1
-caution / 2 stop / 3 dark from the trade's thresholds (rain ≥ 50% or any
-amount, thunder, wind ≥ 25 or gusts ≥ 35, ≤ 32° stop; 25–49% rain, wind
-≥ 18 / gusts ≥ 28, < 40°, ≥ 95° caution). `roofWindows()` finds daylight
+**Roofing window** (w7, sourced in w8): `roofRisk(H, i)` grades each hour
+0 fine / 1 caution / 2 stop / 3 dark. The thresholds are published ones,
+listed with their sources in the comment above `roofRisk` and in the
+explainer: OSHA 1926.968 high wind (stop 30 mph sustained / 40 gust,
+caution 20 / 30), OSHA/NOAA 30/30 lightning (storm hour stops, the next is
+a caution), OSHA's wet-roof guidance plus NIOSH FACE reports (rain stops;
+rain in the previous two hours or dew at first light is a caution), GAF /
+Owens Corning / ARMA 40° shingle minimum (< 40° caution, ≤ 32° stop), OSHA's
+proposed heat rule (heat index 90 caution, 80 noted) with the NWS 103°
+danger band as the app's own stop. The suite checks every rule against
+these numbers — change a threshold in `roofRisk`, the explainer table, the
+source comment and the test together. `roofWindows()` finds daylight
 runs with nothing worse than caution; `roofPlan()` turns the run starting
 now into a verdict against `S.roofHours` (GO needs 2 h of margin, CAUTION
 is a fit with less or a run holding cautious hours, NO GO otherwise; the

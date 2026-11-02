@@ -25,7 +25,7 @@ const ok = (name, cond, detail) => {
 
 /* ---------- fixture: a plausible Open-Meteo answer, pinned to one clock ---------- */
 const NOW = "2026-11-01T09:12";
-const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], wind_gusts_10m: [], relative_humidity_2m: [] };
+const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], wind_gusts_10m: [], relative_humidity_2m: [], dew_point_2m: [] };
 for (let i = 0; i < 48; i++) {
   const d = i < 24 ? "2026-11-01" : "2026-11-02", h = i % 24;
   hourly.time.push(d + "T" + String(h).padStart(2, "0") + ":00");
@@ -40,6 +40,7 @@ for (let i = 0; i < 48; i++) {
   hourly.wind_speed_10m.push(8 + (h % 5));
   hourly.wind_gusts_10m.push(8 + (h % 5) + 9);
   hourly.relative_humidity_2m.push(60);
+  hourly.dew_point_2m.push(hourly.temperature_2m[i] - 12);
 }
 // 15-minute nowcast: dry for 30 min, then rain for an hour.
 const minutely_15 = { time: [], precipitation: [], snowfall: [] };
@@ -248,13 +249,34 @@ ok("roofing card present with a verdict", (await p.locator("#roof").count()) ===
 ok("headline counts the dry hours against the need", (await text(p, "#roofHead")) === "Not enough time. Rain around 2 PM leaves 5 dry hours; you need 6.", await text(p, "#roofHead"));
 ok("48-hour strip, now outlined, red from 2 PM, grey at night", (await p.locator("#roofStrip i").count()) === 39 && (await p.locator("#roofStrip i.now").count()) === 1
   && await p.locator("#roofStrip i:nth-child(6)").evaluate(e => e.classList.contains("r2")) && await p.locator("#roofStrip i:nth-child(12)").evaluate(e => e.classList.contains("r3")));
-ok("factor rows: rain, storms, wind, temp, daylight", (await p.locator(".rf").count()) === 5 && /rain from 2 PM \(5 h away\)/.test(await text(p, ".rooffacts")) && /shingles seal well/.test(await text(p, ".rooffacts")) && /of light left/.test(await text(p, ".rooffacts")));
+ok("factor rows: rain, surface, storms, wind, temp, daylight", (await p.locator(".rf").count()) === 6 && /rain from 2 PM \(5 h away\)/.test(await text(p, ".rooffacts")) && /above the 40° shingle minimum/.test(await text(p, ".rooffacts")) && /of light left/.test(await text(p, ".rooffacts")));
+ok("wind and surface rows cite their sources", /under OSHA's 30 mph line/.test(await text(p, ".rooffacts")) && /dry · no rain in the last two hours/.test(await text(p, ".rooffacts")));
+// The grading rules themselves, hour by hour, against the published thresholds.
+const grade = await p.evaluate(() => {
+  const base = n => ({ time: Array(n).fill("2026-11-01T12:00"), temperature_2m: Array(n).fill(60), apparent_temperature: Array(n).fill(60), dew_point_2m: Array(n).fill(40),
+    precipitation_probability: Array(n).fill(0), precipitation: Array(n).fill(0), weather_code: Array(n).fill(1), is_day: Array(n).fill(1), wind_speed_10m: Array(n).fill(5), wind_gusts_10m: Array(n).fill(8) });
+  const t = (mut, i = 2) => { const H = base(4); mut(H); const r = roofRisk(H, i); return r.lvl + ":" + r.why; };
+  return {
+    wind30: t(H => { H.wind_speed_10m[2] = 30; }), gust40: t(H => { H.wind_gusts_10m[2] = 40; }), wind20: t(H => { H.wind_speed_10m[2] = 20; }), gust30: t(H => { H.wind_gusts_10m[2] = 30; }), wind19: t(H => { H.wind_speed_10m[2] = 19; H.wind_gusts_10m[2] = 29; }),
+    thunder: t(H => { H.weather_code[2] = 95; }), afterThunder: t(H => { H.weather_code[1] = 95; }),
+    rain50: t(H => { H.precipitation_probability[2] = 50; }), rain49: t(H => { H.precipitation_probability[2] = 49; }), rain24: t(H => { H.precipitation_probability[2] = 24; }), amount: t(H => { H.precipitation[2] = 0.02; }),
+    wetDeck: t(H => { H.weather_code[0] = 61; }), dew: t(H => { H.is_day[0] = 0; H.dew_point_2m[2] = 58; }), noDewMidday: t(H => { H.dew_point_2m[2] = 58; }),
+    freeze: t(H => { H.temperature_2m[2] = 32; }), cold: t(H => { H.temperature_2m[2] = 39; }), forty: t(H => { H.temperature_2m[2] = 40; }),
+    heat90: t(H => { H.apparent_temperature[2] = 90; }), heat103: t(H => { H.apparent_temperature[2] = 103; }), heat85: t(H => { H.apparent_temperature[2] = 85; }),
+    dark: t(H => { H.is_day[2] = 0; }),
+  };
+});
+const expect = { wind30: "2:wind", gust40: "2:wind", wind20: "1:gusts", gust30: "1:gusts", wind19: "0:", thunder: "2:thunderstorms", afterThunder: "1:the half hour after thunder",
+  rain50: "2:rain", rain49: "1:a rain chance", rain24: "0:", amount: "2:rain", wetDeck: "1:a wet deck", dew: "1:dew", noDewMidday: "0:", freeze: "2:freezing", cold: "1:cold", forty: "0:",
+  heat90: "1:heat", heat103: "2:dangerous heat", heat85: "0:", dark: "3:dark" };
+for (const k of Object.keys(expect)) ok("rule · " + k + " → " + expect[k], grade[k] === expect[k], grade[k]);
 ok("best window is tomorrow morning, tight fit", /Best window:.*Mon 8 AM to 2 PM, 6 dry hours.*stopped by rain/.test(await text(p, "#roofBest")), await text(p, "#roofBest"));
 await p.click('[data-roof="4"]'); await p.waitForTimeout(300);
 ok("4 hours to dry in → caution, 1 hour of margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /Tight\. 5 dry hours until rain around 2 PM, you need 4; 1 hour of margin\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
 ok("setting persists", JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofHours === 4);
 await p.click(".roof-head"); await p.waitForTimeout(300);
-ok("roofing explainer lists the rules", (await text(p, "#infoT")) === "Roofing window" && /Stop: lightning/.test(await text(p, "#infoB")) && /dried in/.test(await text(p, "#infoB")));
+ok("roofing explainer lists the rules with their sources", (await text(p, "#infoT")) === "Roofing window" && /Stop: lightning/.test(await text(p, "#infoB")) && /1926\.968/.test(await text(p, "#infoB")) && /GAF, Owens Corning, ARMA/.test(await text(p, "#infoB")));
+ok("fourteen source links, all external and new-tab", (await p.locator("#infoB .src a").count()) === 14 && await p.locator("#infoB .src a").evaluateAll(as => as.every(a => /^https:\/\//.test(a.href) && a.target === "_blank" && /noopener/.test(a.rel))));
 await p.click("#infoDone"); await p.waitForTimeout(200);
 await p.click('[data-roof="6"]'); await p.waitForTimeout(200);
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));

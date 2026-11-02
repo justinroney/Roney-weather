@@ -309,6 +309,9 @@ svg{display:block}
 .ipara{font-size:var(--fs-label);color:var(--dim);line-height:1.5;margin:12px 0 6px}
 .ipara b{color:var(--ink)}
 .isec{font-size:var(--fs-micro);font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.11em;margin:16px 0 4px}
+.irow.src{display:block;font-size:var(--fs-label)}
+.irow.src a{color:var(--blue);text-decoration:none;font-weight:600}
+.irow.src a::after{content:" ↗";color:var(--faint)}
 
 /* ---------- overlays (map, alerts) ---------- */
 .ovl{position:fixed;inset:0;z-index:25;background:var(--ground);display:flex;flex-direction:column;
@@ -448,7 +451,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w7 · roofing window";
+const APP_VERSION = "w8 · roofing by the book";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -866,18 +869,52 @@ function renderAlerts() {
 // Can the deck be opened now and dried in before the weather closes it?
 // Thresholds are the trade's rules of thumb; the explainer spells them out.
 const ROOF_HOURS = [4, 6, 8, 10];
+// The thresholds, with where each comes from (the explainer repeats this list):
+//   wind    OSHA 29 CFR 1926.968 note: "high wind" is > 40 mph, or > 30 mph when the
+//           work involves material handling — bundles and sheets on a roof do. Stop at
+//           30 sustained / 40 gust; caution at 20 / 30. 1926.451(f)(12) bars scaffold
+//           work in storms or high wind without a competent person's say-so.
+//   thunder OSHA/NOAA fact sheet 3863: shelter at 30 s flash-to-bang, resume 30 min
+//           after the last thunder — so the hour after a storm hour is a caution.
+//   wet     OSHA's roofing fall guidance: don't work a wet, slippery roof. NIOSH/WA
+//           FACE fatality reports: wet underlayment, rain-swollen decking, morning
+//           dew. Rain in the hour stops work; rain in the previous two hours or dew
+//           in the first daylight hours is a caution.
+//   cold    GAF R-133, Owens Corning and ARMA: install shingles at ≥ 40°F; below it
+//           the sealant won't bond and shingles crack. ≤ 32°F: frost/ice, stop.
+//   heat    OSHA's proposed heat rule: heat index 80°F = water, shade, rest;
+//           90°F = 15-minute breaks every 2 h. NWS "danger" band ≥ 103°F: we stop.
+//   dark    1926.56 needs 5 foot-candles; this app treats night as unavailable.
+function wetBefore(H, i) {
+  for (const j of [i - 1, i - 2]) {
+    if (j < 0) continue;
+    const c = H.weather_code[j];
+    if (((H.precipitation_probability || [])[j] ?? 0) >= 50 || ((H.precipitation || [])[j] ?? 0) > 0.01 || (c >= 51 && c < 95)) return true;
+  }
+  return false;
+}
+function dewy(H, i) {                       // first two daylight hours with the air near saturation
+  const dp = (H.dew_point_2m || [])[i]; if (dp == null || !H.is_day[i]) return false;
+  const firstLight = !H.is_day[i - 1] || !H.is_day[i - 2];
+  return firstLight && H.temperature_2m[i] - dp <= 3;
+}
 function roofRisk(H, i) {                     // 0 fine · 1 caution · 2 stop · 3 dark
   const pp = (H.precipitation_probability || [])[i] ?? 0, pr = (H.precipitation || [])[i] ?? 0, code = H.weather_code[i];
   const w = (H.wind_speed_10m || [])[i] ?? 0, g = (H.wind_gusts_10m || [])[i] ?? w * 1.5, t = H.temperature_2m[i];
+  const hx = (H.apparent_temperature || [])[i] ?? t;
   if (!H.is_day[i]) return { lvl: 3, why: "dark" };
   if (code >= 95) return { lvl: 2, why: "thunderstorms" };
   if (pp >= 50 || pr > 0.01 || code >= 51) return { lvl: 2, why: (code >= 71 && code <= 77) || code === 85 || code === 86 ? "snow" : "rain" };
-  if (w >= 25 || g >= 35) return { lvl: 2, why: "wind" };
+  if (w >= 30 || g >= 40) return { lvl: 2, why: "wind" };
   if (t <= 32) return { lvl: 2, why: "freezing" };
+  if (hx >= 103) return { lvl: 2, why: "dangerous heat" };
+  if (i > 0 && H.weather_code[i - 1] >= 95) return { lvl: 1, why: "the half hour after thunder" };
+  if (wetBefore(H, i)) return { lvl: 1, why: "a wet deck" };
+  if (dewy(H, i)) return { lvl: 1, why: "dew" };
   if (pp >= 25) return { lvl: 1, why: "a rain chance" };
-  if (w >= 18 || g >= 28) return { lvl: 1, why: "gusts" };
+  if (w >= 20 || g >= 30) return { lvl: 1, why: "gusts" };
   if (t < 40) return { lvl: 1, why: "cold" };
-  if (t >= 95) return { lvl: 1, why: "heat" };
+  if (hx >= 90) return { lvl: 1, why: "heat" };
   return { lvl: 0, why: "" };
 }
 // Contiguous daylight runs with nothing worse than a caution, over the hours given.
@@ -910,7 +947,7 @@ function roofPlan(d, hi, need) {
     verdict = "nogo"; head = (soon === 0 ? "Rain is falling now." : `Rain in about ${soon * 15} minutes.`) + " Keep the deck covered.";
     sub = "The 15-minute nowcast sees precipitation inside the next two hours; nothing opens up until it clears.";
   } else if (now.lvl === 2) {
-    verdict = "nogo"; head = ({ rain: "Rain", snow: "Snow", thunderstorms: "Lightning risk", wind: "Dangerous wind", freezing: "Freezing temperatures" })[now.why] + " right now. Don't open the deck.";
+    verdict = "nogo"; head = ({ rain: "Rain", snow: "Snow", thunderstorms: "Lightning risk", wind: "High wind", freezing: "Freezing temperatures", "dangerous heat": "Dangerous heat" })[now.why] + " right now. Don't open the deck.";
     const w = windows[0]; sub = w ? `Next workable stretch: ${nameOf(w.start)} ${hourOf(w.start)}, ${w.len} h before ${stopText(w)}.` : "Nothing workable in the next three days.";
   } else {
     const len = nowWin ? nowWin.len : 0, margin = len - need, stop = nowWin ? stopText(nowWin) : "";
@@ -940,21 +977,26 @@ function roofSection(d, hi, need) {
   const span = P.nowWin ? [P.nowWin.start, Math.min(P.nowWin.start + need, P.nowWin.end + 1)] : [hi, Math.min(hi + need, H.time.length)];
   const rng = (arr) => { let a = Infinity, b = -Infinity; for (let i = span[0]; i < span[1]; i++) { const v = (arr || [])[i]; if (v != null) { a = Math.min(a, v); b = Math.max(b, v); } } return [a, b]; };
   let firstWet = -1; for (let i = hi; i < P.to; i++) { const r = roofRisk(H, i); if (r.why === "rain" || r.why === "snow" || r.why === "thunderstorms") { firstWet = i; break; } }
-  const [wLo, wHi] = rng(H.wind_speed_10m), [gLo, gHi] = rng(H.wind_gusts_10m), [tLo, tHi] = rng(H.temperature_2m);
+  const [wLo, wHi] = rng(H.wind_speed_10m), [gLo, gHi] = rng(H.wind_gusts_10m), [tLo, tHi] = rng(H.temperature_2m), [, hxHi] = rng(H.apparent_temperature);
   const storm = (() => { for (let i = hi; i < P.to; i++) if (H.weather_code[i] >= 95) return i; return -1; })();
   const nameOf = i => fmtDay(H.time[i].slice(0, 10), today), hourOf = i => fmtHour(H.time[i]);
   const when = i => (nameOf(i) === "Today" ? "" : nameOf(i) + " ") + hourOf(i);
   const rainLvl = firstWet < 0 ? 0 : firstWet < hi + need ? 2 : firstWet < hi + need + 3 ? 1 : 0;
-  const windLvl = wHi >= 25 || gHi >= 35 ? 2 : wHi >= 18 || gHi >= 28 ? 1 : 0;
-  const tempLvl = tLo <= 32 ? 2 : tLo < 40 || tHi >= 95 ? 1 : 0;
+  const windLvl = wHi >= 30 || gHi >= 40 ? 2 : wHi >= 20 || gHi >= 30 ? 1 : 0;
+  const tempLvl = tLo <= 32 || hxHi >= 103 ? 2 : tLo < 40 || hxHi >= 90 ? 1 : 0;
+  const start = P.nowWin ? P.nowWin.start : hi;
+  const surf = wetBefore(H, start) ? [1, "wet from earlier rain · let it dry and check footing before the first step (NIOSH FACE)"]
+    : dewy(H, start) ? [1, "dew likely for the first hour or two · wait for it to burn off (NIOSH FACE)"]
+    : [0, "dry · no rain in the last two hours, no dew expected"];
   const stormLvl = storm < 0 ? 0 : storm < hi + need ? 2 : 1;
   const ti = Math.max(0, D.time.indexOf(today));
   const facts =
     rf("Rain", rainLvl, firstWet < 0 ? "none in the next three days" : `${roofRisk(H, firstWet).why} from ${when(firstWet)}${firstWet > hi ? " (" + (firstWet - hi) + " h away)" : ""}`) +
-    rf("Storms", stormLvl, storm < 0 ? "no thunder in the forecast" : `thunder possible ${when(storm)} · lightning clears a roof`) +
-    rf("Wind", windLvl, isFinite(wHi) ? `${U.wind(wLo).split(" ")[0]} to ${U.wind(wHi)}, gusts to ${U.wind(gHi)}` + (windLvl === 2 ? " · too much for sheets and ladders" : windLvl === 1 ? " · hold underlayment down" : " · fine") : "not reported") +
-    rf("Temp", tempLvl, isFinite(tLo) ? `${deg(tLo)} to ${deg(tHi)}` + (tempLvl === 2 ? " · ice on the deck" : tLo < 40 ? " · shingles brittle, sealant slow" : tHi >= 95 ? " · scuffing and heat stress" : " · shingles seal well") : "not reported") +
-    rf("Daylight", H.is_day[hi] ? 0 : 3, `sunrise ${fmtClock(D.sunrise[ti])} · sunset ${fmtClock(D.sunset[ti])}` + (H.is_day[hi] ? " · " + fmtDur(minsBetween(cur.time, D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light left" : ""));
+    rf("Surface", surf[0], surf[1]) +
+    rf("Storms", stormLvl, storm < 0 ? "no thunder in the forecast" : `thunder possible ${when(storm)} · off the roof, 30 min after the last rumble (OSHA/NOAA)`) +
+    rf("Wind", windLvl, isFinite(wHi) ? `${U.wind(wLo).split(" ")[0]} to ${U.wind(wHi)}, gusts to ${U.wind(gHi)}` + (windLvl === 2 ? " · over OSHA's 30 mph line for material handling" : windLvl === 1 ? " · near OSHA's 30 mph line, hold sheets down" : " · under OSHA's 30 mph line") : "not reported") +
+    rf("Temp", tempLvl, isFinite(tLo) ? `${deg(tLo)} to ${deg(tHi)}` + (tLo <= 32 ? " · ice on the deck" : hxHi >= 103 ? " · heat index " + deg(hxHi) + ", NWS danger band" : tLo < 40 ? " · under the 40° shingle minimum (GAF, Owens Corning)" : hxHi >= 90 ? " · heat index " + deg(hxHi) + ", 15-min breaks every 2 h (OSHA)" : hxHi >= 80 ? " · heat index " + deg(hxHi) + ", water and shade (OSHA)" : " · above the 40° shingle minimum, seals well") : "not reported") +
+    rf("Daylight", H.is_day[hi] ? 0 : 3, `sunrise ${fmtClock(D.sunrise[ti])} · sunset ${fmtClock(D.sunset[ti])}` + (H.is_day[hi] ? " · " + fmtDur(minsBetween(cur.time, D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light left" : " · no roof work without lighting (OSHA 1926.56)"));
   const chips = ROOF_HOURS.map(h => `<button class="chip${h === need ? " on" : ""}" data-roof="${h}" aria-pressed="${h === need}">${h} h</button>`).join("");
   const b = P.best;
   const bestText = !b ? "No workable daylight in the next three days."
@@ -972,7 +1014,7 @@ function roofSection(d, hi, need) {
     <div class="roofneed"><span class="lab">Hours to dry in</span>${chips}</div>
     <div class="roofbest" id="roofBest">${bestText}</div>
   </div>
-  <div class="legend">Green hours are safe to have the deck open, amber need care, red stop work, grey is dark. The outlined cell is now. Hours to dry in is tear-off to underlayment down.</div>`;
+  <div class="legend">Green hours are safe to have the deck open, amber need care, red stop work, grey is dark. The outlined cell is now. Hours to dry in is tear-off to underlayment down. Rules follow OSHA, the OSHA/NOAA lightning sheet, shingle makers' 40° minimum and NIOSH fall reports; tap the verdict for the list.</div>`;
 }
 function rf(k, lvl, text) { return `<div class="rf r${lvl}"><span class="d"></span><span class="k">${esc(k)}</span><span>${esc(text)}</span></div>`; }
 
@@ -1074,15 +1116,38 @@ function openInfo(kind, idx) {
       title = "Roofing window";
       b = ibig({ go: "Go", caution: "Caution", nogo: "No go", wait: "Wait" }[P.verdict], (S.roofHours || 6) + " h to dry in", P.verdict === "go" ? "good" : P.verdict === "caution" ? "warn" : P.verdict === "nogo" ? "crit" : "") +
         ipara(`<b>${esc(P.head)}</b> ${esc(P.sub)}`) +
-        `<div class="isec">The rules</div>` +
-        ipara(`The question is whether the deck can be opened and <b>dried in</b> (underlayment down and lapped) before the weather closes it. Set how long your crew needs from first tear-off to dry-in; the verdict counts the dry daylight hours ahead and compares.`) +
-        irow("Stop: rain or snow", "≥ 50% chance, any forecast amount") + irow("Stop: lightning", "thunder in the forecast") +
-        irow("Stop: wind", "≥ 25 mph, or gusts ≥ 35") + irow("Stop: freezing", "≤ 32°, ice on the deck") +
-        irow("Caution: rain", "25–49% chance") + irow("Caution: wind", "≥ 18 mph, or gusts ≥ 28") +
-        irow("Caution: cold", "< 40°, brittle shingles, slow sealing") + irow("Caution: heat", "≥ 95°, scuffing, heat stress") +
-        irow("Dark", "no work between sunset and sunrise") +
-        ipara(`<b>Go</b> needs at least two hours of margin past what you asked for. <b>Caution</b> is a fit with under two hours spare, or a window with gusty, cold or showery hours in it. The 15-minute nowcast overrides everything: rain inside two hours is a no go.`) +
-        ipara(`This is a forecast, not a promise. Check the radar before the first cut, keep tarps on the roof, and dry in section by section.`);
+        `<div class="isec">The rules, and where they come from</div>` +
+        ipara(`The question is whether the deck can be opened and <b>dried in</b> (underlayment down and lapped) before the weather closes it. Set how long your crew needs from first tear-off to dry-in; the verdict counts the dry daylight hours ahead and compares. Each hour is graded by these rules:`) +
+        irow("Stop: rain or snow", "≥ 50% chance or any forecast amount · OSHA: never work a wet, slippery roof") +
+        irow("Stop: lightning", "thunder in the forecast · OSHA/NOAA 30/30 rule; the hour after is a caution") +
+        irow("Stop: wind", "≥ 30 mph sustained or gusts ≥ 40 · OSHA 1926.968: high wind is 30 mph with material handling, 40 without") +
+        irow("Stop: freezing", "≤ 32° · frost and ice on the deck") +
+        irow("Stop: heat", "heat index ≥ 103° · NWS danger band (app rule)") +
+        irow("Caution: wet deck", "rain in the previous two hours, or dew at first light · NIOSH FACE fall reports") +
+        irow("Caution: rain", "25–49% chance · planning practice, not a rule") +
+        irow("Caution: wind", "≥ 20 mph or gusts ≥ 30 · approaching OSHA's line; scaffold work needs a competent person (1926.451)") +
+        irow("Caution: cold", "< 40° · GAF, Owens Corning, ARMA: sealant won't bond, shingles crack; hand-seal") +
+        irow("Caution: heat", "heat index ≥ 90° · OSHA proposed rule: 15-min rest every 2 h; ≥ 80° water and shade") +
+        irow("Dark", "sunset to sunrise · 1926.56 needs 5 foot-candles; the app assumes no lighting") +
+        ipara(`<b>Go</b> needs at least two hours of margin past what you asked for. <b>Caution</b> is a fit with under two hours spare, or a window with cautious hours in it. The 15-minute nowcast overrides everything: rain inside two hours is a no go. Whatever the verdict, OSHA 1926.501(b)(13) still wants fall protection on every residential roof from 6 ft, and the Washington FACE roofer who slid off rain-swollen decking had a harness on and no lanyard clipped.`) +
+        ipara(`Wet decking is its own cost: OSB that swells along the edges doesn't shrink back, and the ridges telegraph through shingles. APA says cover sheathing, and if it got wet, let it dry fully and sand raised joints before underlayment.`) +
+        ipara(`Roofing is the deadliest trade outside logging (BLS: about 49 deaths per 100,000 in 2024, four in five of them falls). This is a forecast, not a promise. Check the radar before the first cut, keep tarps on the roof, and dry in section by section.`) +
+        `<div class="isec">Sources</div>` + [
+          ["OSHA 29 CFR 1926.968 — the high-wind definition", "https://www.osha.gov/laws-regs/regulations/standardnumber/1926/1926.968"],
+          ["OSHA 29 CFR 1926.451(f)(12) — scaffolds in storms or high wind", "https://www.osha.gov/laws-regs/regulations/standardnumber/1926/1926.451"],
+          ["OSHA/NOAA fact sheet 3863 — lightning safety for outdoor workers", "https://www.osha.gov/Publications/OSHA3863.pdf"],
+          ["OSHA — reducing falls installing roofs (wet, slippery surfaces)", "https://www.osha.gov/Publications/reducing-falls-installing-standing-seam-metal-roofs.pdf"],
+          ["OSHA 29 CFR 1926.501(b)(13) — residential fall protection", "https://www.osha.gov/laws-regs/regulations/standardnumber/1926/1926.501"],
+          ["OSHA 29 CFR 1926.56 — illumination", "https://www.osha.gov/laws-regs/regulations/standardnumber/1926/1926.56"],
+          ["OSHA heat injury and illness prevention rulemaking (proposed)", "https://www.osha.gov/heat/rulemaking"],
+          ["GAF R-133 — temperature extremes and asphalt shingles", "https://www.gaf.com/en-us/document-library/documents/technical-bulletins-&-notes/r-133-temperature-extremes-&-fiberglass-asphalt-shingles.pdf"],
+          ["Owens Corning — cold-weather shingle application", "https://www.owenscorning.com/dms/10022497"],
+          ["ARMA — installing asphalt shingles in cold weather", "https://asphaltroofing.org/recommendations-for-installation-of-asphalt-roofing-shingles-in-cold-weather/"],
+          ["NIOSH FACE — roofer falls 18 ft from wet roof", "https://stacks.cdc.gov/view/cdc/228915"],
+          ["Washington FACE — roofer falls from rain-slick decking", "https://www.lni.wa.gov/safety-health/safety-research/files/2021/71_203_2021s_RooferFallsFromSlickRoof.pdf"],
+          ["West Fraser / APA — roof sheathing caught in the rain", "https://osb.westfraser.com/?p=6401"],
+          ["BLS — fatal work injuries by occupation", "https://www.bls.gov/charts/census-of-fatal-occupational-injuries/rate-and-number-of-fatal-work-injuries-in-selected-occupations.htm"],
+        ].map(([t, u]) => `<div class="irow src"><a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a></div>`).join("");
       break;
     }
     case "hour": {
@@ -1123,7 +1188,7 @@ function forecastUrl(l) {
   const p = new URLSearchParams({
     latitude: l.lat, longitude: l.lon, timezone: "auto", forecast_days: "10",
     current: "temperature_2m,relative_humidity_2m,apparent_temperature,is_day,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m,dew_point_2m,pressure_msl,visibility,cloud_cover",
-    hourly: "temperature_2m,apparent_temperature,precipitation_probability,precipitation,weather_code,is_day,uv_index,pressure_msl,wind_speed_10m,wind_gusts_10m,relative_humidity_2m",
+    hourly: "temperature_2m,apparent_temperature,dew_point_2m,precipitation_probability,precipitation,weather_code,is_day,uv_index,pressure_msl,wind_speed_10m,wind_gusts_10m,relative_humidity_2m",
     minutely_15: "precipitation,snowfall",
     daily: "weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,daylight_duration,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_gusts_10m_max,uv_index_max",
     temperature_unit: "fahrenheit", wind_speed_unit: "mph", precipitation_unit: "inch",
