@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~168 checks, every network source mocked, ~20s
+node tests/smoke.mjs        # ~177 checks, every network source mocked, ~22s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -55,7 +55,12 @@ verdict plans on the earlier model) and hourly `cape` (≥ 1500 J/kg is a
 "storm fuel" caution). The forecast call has `past_days=1`, so hourly and
 daily both start yesterday: loops over days start at `ti`, and the Surface
 row sums the 24 h before `hi`. Job size is `S.roofSquares` / `S.roofCrew` /
-`S.roofRate` → `roofNeed()`. `roofTimeline()` draws three days on a fixed
+`S.roofRate` → `roofNeed()`. The Production log (`S.roofLog`, rows of
+`{date, job, sq, crew, hrs|null}`; `S.roofDay` fills missing hours) is
+parsed by `parseLog()` — header row optional, tabs/commas/semicolons —
+and summarised by `logStats()`; "measured pace" is the 25th percentile of
+squares per man-hour, and adopting it sets `S.roofRate`, which then shows
+as an extra chip marked "measured". `roofTimeline()` draws three days on a fixed
 5 AM–9 PM axis (`TL_FROM`/`TL_TO`): hours merged into labelled blocks,
 hatched for hours already gone, a now line, and the job as a dashed box
 from the first workable hour; blocks are buttons that open the hour

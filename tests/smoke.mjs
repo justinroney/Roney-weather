@@ -305,6 +305,24 @@ ok("15 squares with 6 → 2 h job → go with 2 h margin", (await p.locator("#ro
 await p.click('[data-rate="1"]'); await p.waitForTimeout(300);
 ok("pace 1 sq/h with 6 → 3 h job → caution", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /you need 3; 1 hour of margin/.test(await text(p, "#roofHead")) && /× 1 sq per man-hour/.test(await text(p, "#roofCalc")), await text(p, "#roofHead"));
 ok("settings persist", (st => st.roofSquares === 15 && st.roofCrew === 6 && st.roofRate === 1)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
+/* the production log: paste days, measure, adopt */
+await p.click("#roofLogBtn"); await p.waitForTimeout(350);
+ok("log sheet opens empty", await p.locator("#log").evaluate(e => e.classList.contains("on")) && /No days logged yet/.test(await text(p, "#logStats")) && await p.locator("#logUse").isHidden());
+await p.fill("#logText", "date, job, squares, crew, hours\n10/28, Harper St, 28, 4, 7\n10/29, Harper St, 32, 5, 8\n10/30, Oak Ridge, 19, 3, 6\n10/31, Oak Ridge, 24, 4");
+await p.click("#logAdd"); await p.waitForTimeout(300);
+ok("four days parsed, header skipped, missing hours flagged", (await p.locator("#logRows .logrow:not(.h)").count()) === 4 && /0\.75\*/.test(await text(p, "#logRows")) );
+ok("stats: measured 0.75 (slow quarter), typical 0.9, 103 squares", /measured\s+0\.75/i.test(await text(p, "#logStats")) && /typical\s+0\.9/i.test(await text(p, "#logStats")) && /103 sq/.test(await text(p, "#logStats")), (await text(p, "#logStats")).replace(/\s+/g, " "));
+ok("the app still plans at the chip pace and says so", /planning at 1 sq\/h; your days say 0\.75/.test(await text(p, "#logStats")), await text(p, "#logStats"));
+await p.click("#logUse"); await p.waitForTimeout(300);
+ok("measured pace adopted: 0.75 sq/h → 15 sq with 6 is a 4 h job", JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofRate === 0.75 && /you need 4;/.test(await text(p, "#roofHead")) && /0\.75 sq\/h ·measured/.test(await text(p, ".roofneed")), await text(p, "#roofHead"));
+await p.click('[data-logday="6"]'); await p.waitForTimeout(200);
+ok("roof-day setting changes the hourless rows", /24 \/ \(4 × 6\)/.test("24 / (4 × 6)") && /1\*/.test(await text(p, "#logRows")) && JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofDay === 6);
+ok("tab-separated rows without a header parse too", await p.evaluate(() => { const r = parseLog("11/1\tJones\t30\t4\t8\n11/2\tJones\t26\t4"); return r.length === 2 && r[0].sq === 30 && r[0].crew === 4 && r[0].hrs === 8 && r[1].hrs === null && r[1].job === "Jones"; }));
+await p.click("#logClear"); await p.waitForTimeout(200);
+ok("clear empties the log; the adopted pace stays until changed", (await p.locator("#logRows .logrow").count()) === 0 && JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofRate === 0.75);
+await p.click("#logDone"); await p.waitForTimeout(200);
+await p.click('[data-rate="1.5"]'); await p.waitForTimeout(200);
+ok("log button summarises", /Production log · none yet/.test(await text(p, "#roofLogBtn")));
 await p.click("#roofWeek .wd:nth-child(3)"); await p.waitForTimeout(300);
 ok("tapping a workday opens the day explainer with the roofing read", /Tuesday/.test(await text(p, "#infoT")) && /Longest safe window/.test(await text(p, "#infoB")) && /8 AM to 2 PM · 6 h/.test(await text(p, "#infoB")), await text(p, "#infoB"));
 await p.click("#infoDone"); await p.waitForTimeout(200);

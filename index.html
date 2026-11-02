@@ -247,6 +247,24 @@ svg{display:block}
 .wd .t b{color:var(--ink);white-space:nowrap}
 .wd .t span{white-space:nowrap}
 .seal{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--good)}
+.logbtn{display:block;width:100%;text-align:left;background:none;border:none;border-top:1px solid var(--line);padding:11px 14px;font:inherit;color:inherit}
+.logbtn b{display:block;font-size:var(--fs-label)}
+.logbtn small{display:block;color:var(--dim);font-size:var(--fs-cap);margin-top:1px}
+.sheet textarea{width:100%;min-height:120px;border-radius:12px;border:1px solid var(--line);background:var(--card2);color:var(--ink);
+  font:inherit;font-size:14px;padding:10px 12px;margin-top:9px;resize:vertical;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.4}
+.sheet textarea::placeholder{color:var(--faint)}
+.logstats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.logstats div{background:var(--card2);border-radius:12px;padding:9px 10px}
+.logstats .k{font-size:var(--fs-micro);font-weight:800;color:var(--dim);text-transform:uppercase;letter-spacing:.08em}
+.logstats .v{font-size:19px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.logstats .s{font-size:var(--fs-micro);color:var(--faint)}
+.logrow{display:grid;grid-template-columns:62px 1fr 44px 36px 52px;gap:6px;padding:7px 0;border-bottom:1px solid var(--line);font-size:var(--fs-cap);font-variant-numeric:tabular-nums;align-items:baseline}
+.logrow.h{color:var(--dim);font-weight:800;font-size:var(--fs-micro);text-transform:uppercase;letter-spacing:.06em}
+.logrow span:nth-child(n+3){text-align:right}
+.logrow .j{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logrow .r{font-weight:700}
+.btnrow{display:flex;gap:8px;margin-top:12px}
+.btnrow .btn{flex:1}
 .seal.hand{color:var(--warn)}
 
 /* ---------- map launcher ---------- */
@@ -442,6 +460,18 @@ svg{display:block}
     </div>
   </section>
 
+  <section class="sheet" id="log" role="dialog" aria-modal="true" aria-label="Production log" aria-hidden="true">
+    <div class="sheet-h"><b>Production log</b><button class="xbtn" id="logDone">Done</button></div>
+    <div class="sheet-body">
+      <div class="ipara" style="margin-top:0">Paste days from the master schedule, one per line: <b>date, job, squares done, crew, hours</b> (hours optional — a header row is fine, commas or tabs). Pace is squares ÷ (crew × hours).</div>
+      <textarea id="logText" placeholder="date, job, squares, crew, hours&#10;10/28, Harper St, 28, 4, 7.5&#10;10/29, Harper St, 32, 5&#10;10/30, Oak Ridge, 19, 3, 6"></textarea>
+      <div class="roofneed" id="logDays" style="border:none;padding:8px 0 0"></div>
+      <div class="btnrow"><button class="btn" id="logAdd">Add these days</button><button class="btn pri" id="logUse" hidden>Use measured pace</button></div>
+      <div id="logStats"></div>
+      <div id="logRows"></div>
+    </div>
+  </section>
+
   <section class="sheet" id="info" role="dialog" aria-modal="true" aria-label="Details" aria-hidden="true">
     <div class="sheet-h"><b id="infoT">Details</b><button class="xbtn" id="infoDone">Done</button></div>
     <div class="sheet-body" id="infoB"></div>
@@ -486,7 +516,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w11 · updates itself";
+const APP_VERSION = "w12 · measured pace";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -509,7 +539,7 @@ function load() {
     const s = JSON.parse(localStorage.getItem(KEY) || "null");
     if (s && s.schema === 1 && Array.isArray(s.locs)) return s;
   } catch (e) { /* fall through to a fresh state */ }
-  return { schema: 1, unit: "F", theme: "", locs: [], cur: 0, cache: {}, roofSquares: 30, roofCrew: 4, roofRate: 1.5 };
+  return { schema: 1, unit: "F", theme: "", locs: [], cur: 0, cache: {}, roofSquares: 30, roofCrew: 4, roofRate: 1.5, roofLog: [], roofDay: 8 };
 }
 function save() {
   try { localStorage.setItem(KEY, JSON.stringify(S)); }
@@ -913,6 +943,36 @@ function renderAlerts() {
 // Can the deck be opened now and dried in before the weather closes it?
 // Thresholds are the trade's rules of thumb; the explainer spells them out.
 const ROOF_SQUARES = [15, 20, 30, 40, 50], ROOF_CREW = [2, 3, 4, 5, 6], ROOF_RATES = [1, 1.25, 1.5, 2];
+// The production log: rows pasted from the master schedule — date, job, squares done,
+// crew that day, hours if known (else the roof day below). Pace = squares ÷ (crew × hours).
+function parseLog(text) {
+  const rows = [], lines = String(text || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  let cols = null;
+  for (const line of lines) {
+    const cells = line.split(/\t|,|;|\s{2,}|\s\|\s/).map(c => c.trim()).filter((c, i, a) => c !== "" || i < a.length - 1);
+    if (!cols) {
+      const low = cells.map(c => c.toLowerCase());
+      const find = re => low.findIndex(c => re.test(c));
+      const guess = { date: find(/date|day/), job: find(/job|name|address|site|customer|project/), sq: find(/sq|square/), crew: find(/crew|men|guys|workers|people|hands/), hrs: find(/hour|hrs|time/) };
+      if (guess.sq >= 0 && (guess.crew >= 0 || guess.date >= 0)) { cols = guess; continue; }     // a header row
+      cols = { date: 0, job: cells.length >= 5 ? 1 : -1, sq: cells.length >= 5 ? 2 : 1, crew: cells.length >= 5 ? 3 : 2, hrs: cells.length >= 5 ? 4 : cells.length >= 4 ? 3 : -1 };
+    }
+    const num = i => i >= 0 && i < cells.length ? parseFloat(String(cells[i]).replace(/[^0-9.]/g, "")) : NaN;
+    const sq = num(cols.sq), crew = num(cols.crew), hrs = num(cols.hrs);
+    if (!(sq > 0) || !(crew > 0)) continue;
+    rows.push({ date: cols.date >= 0 ? cells[cols.date] : "", job: cols.job >= 0 ? cells[cols.job] || "" : "", sq, crew, hrs: hrs > 0 ? hrs : null });
+  }
+  return rows;
+}
+function logStats(rows, dayHours) {
+  const rates = rows.map(r => r.sq / (r.crew * (r.hrs || dayHours))).filter(v => isFinite(v) && v > 0).sort((a, b) => a - b);
+  if (!rates.length) return null;
+  const q = f => rates[Math.min(rates.length - 1, Math.max(0, Math.floor((rates.length - 1) * f)))];
+  const n = rates.length, median = n % 2 ? rates[(n - 1) / 2] : (rates[n / 2 - 1] + rates[n / 2]) / 2;
+  const totalSq = rows.reduce((a, r) => a + r.sq, 0), manHours = rows.reduce((a, r) => a + r.crew * (r.hrs || dayHours), 0);
+  return { n, median, p25: q(0.25), lo: rates[0], hi: rates[n - 1], overall: totalSq / manHours, totalSq, manHours, logged: rows.filter(r => r.hrs).length };
+}
+const roundRate = v => Math.max(0.25, Math.round(v * 20) / 20);
 const roofRate = () => S.roofRate || 1.5;   // squares torn off and dried in per man-hour; 1.5 is a working crew's pace
 function roofNeed() {
   const sq = S.roofSquares || 30, crew = S.roofCrew || 4;
@@ -1055,7 +1115,8 @@ function roofSection(d, hi, need) {
   const sq = S.roofSquares || 30, crew = S.roofCrew || 4;
   const chips = `<span class="grp"><span class="lab">Job</span>${ROOF_SQUARES.map(v => `<button class="chip${v === sq ? " on" : ""}" data-sq="${v}" aria-pressed="${v === sq}">${v} sq</button>`).join("")}</span>
     <span class="grp"><span class="lab">Crew</span>${ROOF_CREW.map(v => `<button class="chip${v === crew ? " on" : ""}" data-crew="${v}" aria-pressed="${v === crew}">${v}</button>`).join("")}</span>
-    <span class="grp"><span class="lab">Pace</span>${ROOF_RATES.map(v => `<button class="chip${v === roofRate() ? " on" : ""}" data-rate="${v}" aria-pressed="${v === roofRate()}">${v} sq/h</button>`).join("")}<span class="calc" style="width:auto;margin:0">per person</span></span>
+    <span class="grp"><span class="lab">Pace</span>${(() => { const st = logStats(S.roofLog || [], S.roofDay || 8); const m = st ? roundRate(st.p25) : null; const opts = m && !ROOF_RATES.includes(m) ? [...ROOF_RATES, m].sort((a, b) => a - b) : ROOF_RATES;
+      return opts.map(v => `<button class="chip${v === roofRate() ? " on" : ""}" data-rate="${v}" aria-pressed="${v === roofRate()}">${v} sq/h${v === m ? " ·measured" : ""}</button>`).join(""); })()}<span class="calc" style="width:auto;margin:0">per person</span></span>
     <span class="calc" id="roofCalc">≈ <b>${need} h to dry in</b>: ${sq} squares ÷ (${crew} on the roof × ${roofRate()} sq per man-hour), rounded up.</span>`;
   const b = P.best;
   const bestText = !b ? "No workable daylight in the next three days."
@@ -1071,6 +1132,9 @@ function roofSection(d, hi, need) {
     <div class="rooffacts">${facts}</div>
     <div class="roofneed">${chips}</div>
     <div class="roofbest" id="roofBest">${bestText}</div>
+    <button class="logbtn" data-act="log" id="roofLogBtn">${(() => { const st = logStats(S.roofLog || [], S.roofDay || 8);
+      return st ? `<b>Production log · ${st.n} day${st.n === 1 ? "" : "s"} · measured pace ${roundRate(st.p25)} sq/h (median ${roundRate(st.median)})</b><small>${st.totalSq} squares over ${Math.round(st.manHours)} man-hours · tap to add days or change the pace</small>`
+        : `<b>Production log · none yet</b><small>Paste days from the master schedule (squares done, crew on the roof) and the pace becomes yours, not a rule of thumb</small>`; })()}</button>
   </div>
   <div class="legend">One row per day on the same clock, 5 AM to 9 PM. The dashed box is your job laid on the timeline from the first workable hour: it has to fit inside green before red or dark. Tap any block for that hour. Rules follow OSHA, the OSHA/NOAA lightning sheet, shingle makers' 40° minimum and NIOSH fall reports; tap the verdict for the list.</div>
   ${roofOutlook(d, hi, need)}`;
@@ -1263,7 +1327,7 @@ function openInfo(kind, idx) {
       b = ibig({ go: "Go", caution: "Caution", nogo: "No go", wait: "Wait" }[P.verdict], need + " h to dry in", P.verdict === "go" ? "good" : P.verdict === "caution" ? "warn" : P.verdict === "nogo" ? "crit" : "") +
         ipara(`<b>${esc(P.head)}</b> ${esc(P.sub)}`) +
         `<div class="isec">Built for the trade</div>` +
-        ipara(`A roofer's questions, in order: <b>which days can I book a tear-off</b> (the Workdays list: each day's longest safe window, when the crew can start after dew or frost, what ends it); <b>how big a job fits</b> (job size in squares, crew on the roof and the crew's pace in squares per man-hour give the hours to dry in); <b>when exactly does rain arrive, and how sure is that</b> (the Rain and Timing rows: the default blend forecast against NOAA's HRRR model, the sharpest short-range storm model for the US, planning on whichever is earlier); <b>could a storm fire anyway</b> (CAPE, the atmosphere's thunderstorm fuel, flags afternoons over 1,500 J/kg); <b>is the old roof still wet</b> (rain in the last 24 hours); and <b>will the shingles seal</b> (two of the three days after install at 45° with sun, or plan to hand-seal).`) +
+        ipara(`A roofer's questions, in order: <b>which days can I book a tear-off</b> (the Workdays list: each day's longest safe window, when the crew can start after dew or frost, what ends it); <b>how big a job fits</b> (job size in squares, crew on the roof and the crew's pace in squares per man-hour give the hours to dry in; paste days from the master schedule into the Production log and the pace becomes the measured one); <b>when exactly does rain arrive, and how sure is that</b> (the Rain and Timing rows: the default blend forecast against NOAA's HRRR model, the sharpest short-range storm model for the US, planning on whichever is earlier); <b>could a storm fire anyway</b> (CAPE, the atmosphere's thunderstorm fuel, flags afternoons over 1,500 J/kg); <b>is the old roof still wet</b> (rain in the last 24 hours); and <b>will the shingles seal</b> (two of the three days after install at 45° with sun, or plan to hand-seal).`) +
         `<div class="isec">The rules, and where they come from</div>` +
         ipara(`The question is whether the deck can be opened and <b>dried in</b> (underlayment down and lapped) before the weather closes it. Set how long your crew needs from first tear-off to dry-in; the verdict counts the dry daylight hours ahead and compares. Each hour is graded by these rules:`) +
         irow("Stop: rain or snow", "≥ 50% chance or any forecast amount · OSHA: never work a wet, slippery roof") +
@@ -1340,7 +1404,27 @@ function openInfo(kind, idx) {
   $("infoT").textContent = title; $("infoB").innerHTML = b;
   $("info").classList.add("on"); $("scrim").classList.add("on"); $("info").setAttribute("aria-hidden", "false");
 }
-function closeInfo() { $("info").classList.remove("on"); $("info").setAttribute("aria-hidden", "true"); if (!$("sheet").classList.contains("on")) $("scrim").classList.remove("on"); }
+function openLog() {
+  renderLog();
+  $("log").classList.add("on"); $("scrim").classList.add("on"); $("log").setAttribute("aria-hidden", "false");
+}
+function closeLog() { $("log").classList.remove("on"); $("log").setAttribute("aria-hidden", "true"); if (!$("sheet").classList.contains("on") && !$("info").classList.contains("on")) $("scrim").classList.remove("on"); }
+function renderLog() {
+  const rows = S.roofLog || [], day = S.roofDay || 8, st = logStats(rows, day);
+  $("logDays").innerHTML = `<span class="lab">Roof day when hours aren't given</span>` + [6, 7, 8, 9, 10].map(h => `<button class="chip${h === day ? " on" : ""}" data-logday="${h}" aria-pressed="${h === day}">${h} h</button>`).join("");
+  $("logUse").hidden = !st;
+  if (st) $("logUse").textContent = `Use measured pace · ${roundRate(st.p25)} sq/h`;
+  $("logStats").innerHTML = !st ? `<div class="empty">No days logged yet</div>` :
+    `<div class="logstats">
+      <div><div class="k">Measured</div><div class="v">${roundRate(st.p25)}</div><div class="s">sq per man-hour · the slower quarter of days, so the plan holds on an ordinary day</div></div>
+      <div><div class="k">Typical</div><div class="v">${roundRate(st.median)}</div><div class="s">median day · range ${roundRate(st.lo)} to ${roundRate(st.hi)}</div></div>
+      <div><div class="k">Logged</div><div class="v">${st.n}</div><div class="s">days · ${st.totalSq} sq · ${Math.round(st.manHours)} man-h${st.logged < st.n ? " · " + (st.n - st.logged) + " at " + day + " h/day" : ""}</div></div>
+    </div>` + (roofRate() === roundRate(st.p25) ? `<div class="ipara">The app is planning at your measured pace.</div>` : `<div class="ipara">The app is planning at <b>${roofRate()} sq/h</b>; your days say <b>${roundRate(st.p25)}</b>.</div>`);
+  $("logRows").innerHTML = rows.length ? `<div class="logrow h"><span>Date</span><span>Job</span><span>Sq</span><span>Crew</span><span>Sq/m-h</span></div>` +
+    rows.slice().reverse().map((r, k) => `<div class="logrow"><span>${esc(r.date)}</span><span class="j">${esc(r.job)}</span><span>${r.sq}</span><span>${r.crew}</span><span class="r">${roundRate(r.sq / (r.crew * (r.hrs || day)))}${r.hrs ? "" : "*"}</span></div>`).join("") +
+    `<div class="btnrow"><button class="btn" id="logClear">Clear the log</button></div><div class="legend">* hours not given, ${day} h roof day assumed. Measured pace is the 25th percentile, the slower quarter of days.</div>` : "";
+}
+function closeInfo() { $("info").classList.remove("on"); $("info").setAttribute("aria-hidden", "true"); if (!$("sheet").classList.contains("on") && !$("log").classList.contains("on")) $("scrim").classList.remove("on"); }
 
 /* ================= data ================= */
 let BUSY = false;
@@ -1489,7 +1573,7 @@ function openSheet(focusSearch) {
   if (focusSearch) setTimeout(() => $("q").focus(), 280);
 }
 function closeSheet() {
-  $("sheet").classList.remove("on"); if (!$("info").classList.contains("on")) $("scrim").classList.remove("on");
+  $("sheet").classList.remove("on"); if (!$("info").classList.contains("on") && !$("log").classList.contains("on")) $("scrim").classList.remove("on");
   $("sheet").setAttribute("aria-hidden", "true");
   $("q").value = ""; $("results").innerHTML = "";
 }
@@ -1727,7 +1811,19 @@ $("refreshBtn").addEventListener("click", () => refresh(true));
 $("locBtn").addEventListener("click", () => openSheet(false));
 $("sheetDone").addEventListener("click", closeSheet);
 $("infoDone").addEventListener("click", closeInfo);
-$("scrim").addEventListener("click", () => { closeSheet(); closeInfo(); });
+$("logDone").addEventListener("click", closeLog);
+$("scrim").addEventListener("click", () => { closeSheet(); closeInfo(); closeLog(); });
+$("logAdd").addEventListener("click", () => {
+  const rows = parseLog($("logText").value);
+  if (!rows.length) { toast("Couldn't read any days — need squares and crew on each line"); return; }
+  S.roofLog = (S.roofLog || []).concat(rows); save(); $("logText").value = ""; renderLog(); render();
+  toast(rows.length + " day" + (rows.length === 1 ? "" : "s") + " added");
+});
+$("logUse").addEventListener("click", () => { const st = logStats(S.roofLog || [], S.roofDay || 8); if (!st) return; S.roofRate = roundRate(st.p25); save(); renderLog(); render(); toast("Planning at " + S.roofRate + " sq per man-hour"); });
+$("log").addEventListener("click", e => {
+  const d = e.target.closest("[data-logday]"); if (d) { S.roofDay = +d.dataset.logday; save(); renderLog(); render(); return; }
+  if (e.target.closest("#logClear")) { S.roofLog = []; save(); renderLog(); render(); }
+});
 $("geoBtn").addEventListener("click", useMyLocation);
 $("q").addEventListener("input", e => { clearTimeout(searchT); searchT = setTimeout(() => search(e.target.value), 280); });
 $("q").addEventListener("keydown", e => { if (e.key === "Enter") { clearTimeout(searchT); search(e.target.value); } });
@@ -1754,10 +1850,11 @@ document.addEventListener("click", e => {
   else if (b.dataset.act === "search") openSheet(true);
   else if (b.dataset.act === "refresh") refresh(true);
   else if (b.dataset.act === "map") openOverlay("map");
+  else if (b.dataset.act === "log") openLog();
   else if (b.dataset.act === "alerts") openOverlay("alerts");
 });
 document.addEventListener("keydown", e => {
-  if (e.key === "Escape") { closeSheet(); closeInfo(); if (location.hash) closeOverlay(); }
+  if (e.key === "Escape") { closeSheet(); closeInfo(); closeLog(); if (location.hash) closeOverlay(); }
   if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-hour],[data-day]")) { e.preventDefault(); e.target.click(); }
 });
 window.addEventListener("popstate", route);
@@ -1791,7 +1888,7 @@ if ("serviceWorker" in navigator && location.protocol === "https:") {
   }).catch(() => {});
   let hadWorker = !!navigator.serviceWorker.controller, pendingReload = false;
   const reloadSoon = () => {
-    if (document.hidden || location.hash || $("sheet").classList.contains("on") || $("info").classList.contains("on")) { pendingReload = true; return; }
+    if (document.hidden || location.hash || $("sheet").classList.contains("on") || $("info").classList.contains("on") || $("log").classList.contains("on")) { pendingReload = true; return; }
     location.reload();
   };
   navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadWorker) reloadSoon(); hadWorker = true; });

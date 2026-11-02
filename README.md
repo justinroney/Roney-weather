@@ -6,7 +6,7 @@ A personal weather app: one hand-written `index.html`, zero dependencies, no
 build step. Installable as its own app from Chrome (⋮ → Install app) or
 Safari (Share → Add to Home Screen).
 
-What it does (w10):
+What it does (w12):
 
 - **Places** — search a city, or use the phone's location. Saved on the
   device; the last forecast per place is kept so the app answers with no signal.
@@ -25,7 +25,10 @@ What it does (w10):
   sunset, moon phase.
 - **Roofing window, built for the trade** — can the deck be opened now and
   dried in before the weather closes it? Size the job in squares, crew on
-  the roof and the crew's pace in squares per man-hour (all saved); get a
+  the roof and the crew's pace in squares per man-hour (all saved) — or
+  paste days from the master schedule into the **Production log** (date,
+  job, squares done, crew, hours) and adopt the measured pace, the slower
+  quarter of real days, so the plan holds on an ordinary one; get a
   GO / CAUTION / NO GO verdict with the reason ("Rain (HRRR) around 1 PM
   leaves 4 dry hours; you need 5"), a three-day timeline on one 5 AM–9 PM
   clock with labelled blocks ("dry 4 h", "rain", "dew", "dark"), a now line
@@ -75,7 +78,7 @@ hurricane tracks from the NHC feeds, storm reports, an hourly detail sheet.
 - `sw.js` — offline shell (network-first). `CACHE` must match `APP_VERSION`.
 - `manifest.json`, `icons/` — the install surface. `icons/icon.svg` is the
   source; the PNGs were rendered from it with headless Chromium.
-- `tests/smoke.mjs` — the suite (~168 checks, including every roofing
+- `tests/smoke.mjs` — the suite (~177 checks, including every roofing
   threshold against its published value). Open-Meteo, NWS, Rain Viewer
   and the map tiles are all mocked at the network layer.
 
