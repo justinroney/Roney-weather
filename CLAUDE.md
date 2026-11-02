@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~146 checks, every network source mocked, ~17s
+node tests/smoke.mjs        # ~161 checks, every network source mocked, ~20s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -47,9 +47,19 @@ a caution), OSHA's wet-roof guidance plus NIOSH FACE reports (rain stops;
 rain in the previous two hours or dew at first light is a caution), GAF /
 Owens Corning / ARMA 40° shingle minimum (< 40° caution, ≤ 32° stop), OSHA's
 proposed heat rule (heat index 90 caution, 80 noted) with the NWS 103°
-danger band as the app's own stop. The suite checks every rule against
-these numbers — change a threshold in `roofRisk`, the explainer table, the
-source comment and the test together. `roofWindows()` finds daylight
+danger band as the app's own stop. w9 added two more inputs: NOAA's HRRR
+model (a second `forecastUrl`-style call with `models=gfs_hrrr`, 48 h, US
+only, cached as `c.hrrr`; `attachAlt()` marks its wet hours onto the
+blend's hourly as `alt_wet`, which `roofRisk` treats as a stop — the
+verdict plans on the earlier model) and hourly `cape` (≥ 1500 J/kg is a
+"storm fuel" caution). The forecast call has `past_days=1`, so hourly and
+daily both start yesterday: loops over days start at `ti`, and the Surface
+row sums the 24 h before `hi`. Job size is `S.roofSquares` / `S.roofCrew`
+→ `roofNeed()` at `ROOF_RATE` squares per man-hour. `roofOutlook()` is the
+seven-day workdays list (longest `roofWindows` run per day; "seals" = two
+of the next three days ≥ 45° with weather code ≤ 2). The suite checks
+every rule against these numbers — change a threshold in `roofRisk`, the
+explainer table, the source comment and the test together. `roofWindows()` finds daylight
 runs with nothing worse than caution; `roofPlan()` turns the run starting
 now into a verdict against `S.roofHours` (GO needs 2 h of margin, CAUTION
 is a fit with less or a run holding cautious hours, NO GO otherwise; the

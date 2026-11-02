@@ -25,16 +25,18 @@ const ok = (name, cond, detail) => {
 
 /* ---------- fixture: a plausible Open-Meteo answer, pinned to one clock ---------- */
 const NOW = "2026-11-01T09:12";
-const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], wind_gusts_10m: [], relative_humidity_2m: [], dew_point_2m: [] };
-for (let i = 0; i < 48; i++) {
-  const d = i < 24 ? "2026-11-01" : "2026-11-02", h = i % 24;
+const hourly = { time: [], temperature_2m: [], apparent_temperature: [], precipitation_probability: [], precipitation: [], weather_code: [], is_day: [], uv_index: [], pressure_msl: [], wind_speed_10m: [], wind_gusts_10m: [], relative_humidity_2m: [], dew_point_2m: [], cape: [] };
+const HDAYS = ["2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09", "2026-11-10"];
+for (let i = 0; i < 24 * HDAYS.length; i++) {
+  const d = HDAYS[Math.floor(i / 24)], h = i % 24;
   hourly.time.push(d + "T" + String(h).padStart(2, "0") + ":00");
   hourly.temperature_2m.push(48 + 14 * Math.sin((h - 6) / 24 * Math.PI * 2) + (i >= 24 ? -3 : 0));
   hourly.precipitation_probability.push(h >= 14 && h <= 17 ? 40 : 0);
   hourly.weather_code.push(h >= 14 && h <= 17 ? 61 : h < 10 ? 2 : 1);
   hourly.is_day.push(h >= 8 && h < 18 ? 1 : 0);
   hourly.uv_index.push(h >= 10 && h <= 15 ? 4 : 1);
-  hourly.pressure_msl.push(1012 + i * 0.6);       // rising 1.8 hPa over three hours
+  hourly.pressure_msl.push(1012 + (i - 24) * 0.6);  // rising ~2.8 hPa over the three hours before 9 AM today
+  hourly.cape.push(h >= 15 && h <= 18 ? 1700 : 300);  // storm fuel in the late afternoon
   hourly.apparent_temperature.push(hourly.temperature_2m[i] - 3);
   hourly.precipitation.push(h >= 14 && h <= 17 ? 0.05 : 0);
   hourly.wind_speed_10m.push(8 + (h % 5));
@@ -50,20 +52,22 @@ for (let i = 0; i < 16; i++) {
   minutely_15.precipitation.push(i >= 2 && i < 6 ? 0.04 * (i - 1) : 0);
   minutely_15.snowfall.push(0);
 }
-const DAYS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"];
+// Daily starts with yesterday, like a past_days=1 answer does.
 const daily = {
-  time: DAYS.map(d => "2026-11-" + d),
-  weather_code: [61, 3, 1, 0, 95, 71, 2, 2, 3, 0],
-  temperature_2m_max: [62.6, 58, 61, 66, 59, 41, 47, 50, 54, 57],
-  temperature_2m_min: [41.2, 39, 37, 44, 46, 28, 30, 31, 35, 38],
+  time: HDAYS.slice(),
+  weather_code: [2, 61, 3, 1, 0, 95, 71, 2, 2, 3, 0],
+  temperature_2m_max: [60, 62.6, 58, 61, 66, 59, 41, 47, 50, 54, 57],
+  temperature_2m_min: [40, 41.2, 39, 37, 44, 46, 28, 30, 31, 35, 38],
   sunrise: daily_t("07:48"), sunset: daily_t("18:32"),
-  precipitation_probability_max: [40, 10, 0, 0, 80, 70, 5, 0, 10, 0],
-  precipitation_sum: [0.12, 0, 0, 0, 0.6, 0.3, 0, 0, 0, 0],
-  daylight_duration: DAYS.map((_, i) => 38640 - i * 100),
-  wind_speed_10m_max: [14, 12, 10, 9, 22, 18, 11, 10, 9, 8], wind_gusts_10m_max: [24, 20, 18, 15, 41, 30, 19, 17, 15, 14],
-  uv_index_max: [4, 4, 5, 5, 3, 2, 4, 4, 4, 5],
+  precipitation_probability_max: [30, 40, 10, 0, 0, 80, 70, 5, 0, 10, 0],
+  precipitation_sum: [0.2, 0.12, 0, 0, 0, 0.6, 0.3, 0, 0, 0, 0],
+  daylight_duration: HDAYS.map((_, i) => 38740 - i * 100),
+  wind_speed_10m_max: [12, 14, 12, 10, 9, 22, 18, 11, 10, 9, 8], wind_gusts_10m_max: [20, 24, 20, 18, 15, 41, 30, 19, 17, 15, 14],
+  uv_index_max: [4, 4, 4, 5, 5, 3, 2, 4, 4, 4, 5],
 };
-function daily_t(hm) { return DAYS.map(d => "2026-11-" + d + "T" + hm); }
+function daily_t(hm) { return HDAYS.map(d => d + "T" + hm); }
+// HRRR disagrees by an hour: it has rain from 1 PM where the blend says 2 PM.
+const HRRR = { hourly: { time: hourly.time.slice(24, 72), precipitation: hourly.time.slice(24, 72).map(t => { const h = +t.slice(11, 13); return h === 13 ? 0.03 : h >= 14 && h <= 17 ? 0.05 : 0; }), weather_code: hourly.time.slice(24, 72).map(t => { const h = +t.slice(11, 13); return h >= 13 && h <= 17 ? 61 : 1; }) } };
 const FORECAST = {
   latitude: 36.7, longitude: -97.08, timezone: "America/Chicago", timezone_abbreviation: "CST",
   current: { time: NOW, temperature_2m: 57.4, relative_humidity_2m: 61, apparent_temperature: 54.1, is_day: 1,
@@ -115,8 +119,10 @@ async function page(opts = {}) {
   p.errors = [];
   p.on("pageerror", e => p.errors.push(String(e)));
   p.on("console", m => { if (m.type() === "error") p.errors.push(m.text()); });
-  await p.route("**/api.open-meteo.com/**", r => { apiCalls++; return apiDown ? r.fulfill({ status: 503, body: "down" })
-    : r.fulfill({ json: opts.noMinutely ? { ...FORECAST, minutely_15: undefined } : FORECAST }); });
+  await p.route("**/api.open-meteo.com/**", r => {
+    if (/models=gfs_hrrr/.test(r.request().url())) return r.fulfill({ json: HRRR });
+    apiCalls++; return apiDown ? r.fulfill({ status: 503, body: "down" }) : r.fulfill({ json: opts.noMinutely ? { ...FORECAST, minutely_15: undefined } : FORECAST });
+  });
   await p.route("**/geocoding-api.open-meteo.com/**", r => r.fulfill({ json: GEO }));
   await p.route("**/api.bigdatacloud.net/**", r => r.fulfill({ json: { city: "Ponca City", principalSubdivisionCode: "US-OK", countryCode: "US" } }));
   await mockExtras(p, opts.noAlerts);
@@ -246,11 +252,15 @@ const bare = JSON.parse(JSON.stringify(state));
 p = await page({ state: bare, noMinutely: true });
 await p.goto(BASE); await p.waitForTimeout(600);
 ok("roofing card present with a verdict", (await p.locator("#roof").count()) === 1 && (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "NOGO");
-ok("headline counts the dry hours against the need", (await text(p, "#roofHead")) === "Not enough time. Rain around 2 PM leaves 5 dry hours; you need 6.", await text(p, "#roofHead"));
-ok("48-hour strip, now outlined, red from 2 PM, grey at night", (await p.locator("#roofStrip i").count()) === 39 && (await p.locator("#roofStrip i.now").count()) === 1
-  && await p.locator("#roofStrip i:nth-child(6)").evaluate(e => e.classList.contains("r2")) && await p.locator("#roofStrip i:nth-child(12)").evaluate(e => e.classList.contains("r3")));
-ok("factor rows: rain, surface, storms, wind, temp, daylight", (await p.locator(".rf").count()) === 6 && /rain from 2 PM \(5 h away\)/.test(await text(p, ".rooffacts")) && /above the 40° shingle minimum/.test(await text(p, ".rooffacts")) && /of light left/.test(await text(p, ".rooffacts")));
-ok("wind and surface rows cite their sources", /under OSHA's 30 mph line/.test(await text(p, ".rooffacts")) && /dry · no rain in the last two hours/.test(await text(p, ".rooffacts")));
+ok("headline counts the dry hours against the job, on the earlier model", (await text(p, "#roofHead")) === "Not enough time. Rain (HRRR) around 1 PM leaves 4 dry hours; you need 5.", await text(p, "#roofHead"));
+ok("job maths shown", /5 h to dry in.*30 squares ÷ \(4 on the roof × 1\.5 sq per man-hour\)/.test(await text(p, "#roofCalc")), await text(p, "#roofCalc"));
+ok("48-hour strip, now outlined, red from 2 PM, grey at night", (await p.locator("#roofStrip i").count()) === 48 && (await p.locator("#roofStrip i.now").count()) === 1
+  && await p.locator("#roofStrip i:nth-child(5)").evaluate(e => e.classList.contains("r2")) && await p.locator("#roofStrip i:nth-child(12)").evaluate(e => e.classList.contains("r3")));
+ok("factor rows: rain, timing, surface, storms, wind, temp, daylight", (await p.locator(".rf").count()) === 7 && /rain \(HRRR\) from 1 PM \(4 h away\)/.test(await text(p, ".rooffacts")) && /above the 40° shingle minimum/.test(await text(p, ".rooffacts")) && /of light left/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
+ok("timing row compares the two models", /blend says 2 PM, HRRR says 1 PM · planning on the earlier/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
+ok("surface row knows yesterday's rain", /0\.2 in fell in the last 24 h/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
+ok("storms row sees the afternoon storm fuel", /storm fuel is high 3 PM \(CAPE 1700\)/.test(await text(p, ".rooffacts")), await text(p, ".rooffacts"));
+ok("wind row cites OSHA", /under OSHA's 30 mph line/.test(await text(p, ".rooffacts")));
 // The grading rules themselves, hour by hour, against the published thresholds.
 const grade = await p.evaluate(() => {
   const base = n => ({ time: Array(n).fill("2026-11-01T12:00"), temperature_2m: Array(n).fill(60), apparent_temperature: Array(n).fill(60), dew_point_2m: Array(n).fill(40),
@@ -264,23 +274,36 @@ const grade = await p.evaluate(() => {
     freeze: t(H => { H.temperature_2m[2] = 32; }), cold: t(H => { H.temperature_2m[2] = 39; }), forty: t(H => { H.temperature_2m[2] = 40; }),
     heat90: t(H => { H.apparent_temperature[2] = 90; }), heat103: t(H => { H.apparent_temperature[2] = 103; }), heat85: t(H => { H.apparent_temperature[2] = 85; }),
     dark: t(H => { H.is_day[2] = 0; }),
+    hrrr: t(H => { H.alt_wet = [false, false, true, false]; }), cape: t(H => { H.cape = [0, 0, 1500, 0]; }), cape1400: t(H => { H.cape = [0, 0, 1400, 0]; }),
   };
 });
 const expect = { wind30: "2:wind", gust40: "2:wind", wind20: "1:gusts", gust30: "1:gusts", wind19: "0:", thunder: "2:thunderstorms", afterThunder: "1:the half hour after thunder",
   rain50: "2:rain", rain49: "1:a rain chance", rain24: "0:", amount: "2:rain", wetDeck: "1:a wet deck", dew: "1:dew", noDewMidday: "0:", freeze: "2:freezing", cold: "1:cold", forty: "0:",
-  heat90: "1:heat", heat103: "2:dangerous heat", heat85: "0:", dark: "3:dark" };
+  heat90: "1:heat", heat103: "2:dangerous heat", heat85: "0:", dark: "3:dark", hrrr: "2:rain in the HRRR model", cape: "1:storm fuel", cape1400: "0:" };
 for (const k of Object.keys(expect)) ok("rule · " + k + " → " + expect[k], grade[k] === expect[k], grade[k]);
-ok("best window is tomorrow morning, tight fit", /Best window:.*Mon 8 AM to 2 PM, 6 dry hours.*stopped by rain/.test(await text(p, "#roofBest")), await text(p, "#roofBest"));
-await p.click('[data-roof="4"]'); await p.waitForTimeout(300);
-ok("4 hours to dry in → caution, 1 hour of margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /Tight\. 5 dry hours until rain around 2 PM, you need 4; 1 hour of margin\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
-ok("setting persists", JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1"))).roofHours === 4);
+ok("best window is tomorrow morning, HRRR-trimmed, tight fit", /Best window:.*Mon 8 AM to 1 PM, 5 dry hours.*stopped by rain in the HRRR model/.test(await text(p, "#roofBest")), await text(p, "#roofBest"));
+ok("seven workdays listed with verdict pills", (await p.locator("#roofWeek .wd").count()) === 7 && (await p.locator("#roofWeek .pill").count()) === 7);
+ok("today: 9 AM to 1 PM, 4 h, 1 h short", /9 AM to 1 PM · 4 h/.test(await text(p, "#roofWeek .wd:nth-child(1) .w")) && /1 h short for the job · ends with rain \(HRRR\)/.test(await text(p, "#roofWeek .wd:nth-child(1) .w")), await text(p, "#roofWeek .wd:nth-child(1) .w"));
+ok("Tuesday beyond HRRR: 8 AM to 2 PM, 6 h, fits no margin", /8 AM to 2 PM · 6 h/.test(await text(p, "#roofWeek .wd:nth-child(3) .w")) && /fits, no margin/.test(await text(p, "#roofWeek .wd:nth-child(3) .w")), await text(p, "#roofWeek .wd:nth-child(3) .w"));
+ok("each day shows hi/lo, peak gust and a seal-down call", /63° \/ 41°/.test(await text(p, "#roofWeek .wd:nth-child(1) .t")) && /gusts 21/.test(await text(p, "#roofWeek .wd:nth-child(1) .t")) && (await p.locator("#roofWeek .wd:nth-child(1) .seal").count()) === 1);
+ok("Wednesday seals (Thu 59° storms, Fri 41° snow, Sat 47° partly → only 1 sunny warm day → hand-seal); Tuesday: Wed 66° clear + Thu no + Fri no → hand-seal", (await p.locator("#roofWeek .wd:nth-child(3) .seal").textContent()) === "hand-seal" && (await p.locator("#roofWeek .wd:nth-child(6) .seal").textContent()) === "seals", await p.locator("#roofWeek .wd:nth-child(6) .seal").textContent());
+await p.click('[data-crew="6"]'); await p.waitForTimeout(300);
+ok("6 on the roof → 4 h job → caution with no margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "CAUTION" && /Tight\. 4 dry hours until rain \(HRRR\) around 1 PM, you need 4; no margin\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
+await p.click('[data-sq="15"]'); await p.waitForTimeout(300);
+ok("15 squares with 6 → 2 h job → go with 2 h margin", (await p.locator("#roofVerdict").innerText()).replace(/\s/g, "") === "GO" && /Good to go\. 4 dry hours until rain \(HRRR\) around 1 PM, 2 more than you need\./.test(await text(p, "#roofHead")), await text(p, "#roofHead"));
+ok("settings persist", (st => st.roofSquares === 15 && st.roofCrew === 6)(JSON.parse(await p.evaluate(() => localStorage.getItem("roney-weather-v1")))));
+await p.click("#roofWeek .wd:nth-child(3)"); await p.waitForTimeout(300);
+ok("tapping a workday opens the day explainer with the roofing read", /Tuesday/.test(await text(p, "#infoT")) && /Longest safe window/.test(await text(p, "#infoB")) && /8 AM to 2 PM · 6 h/.test(await text(p, "#infoB")), await text(p, "#infoB"));
+await p.click("#infoDone"); await p.waitForTimeout(200);
 await p.click(".roof-head"); await p.waitForTimeout(300);
 ok("roofing explainer lists the rules with their sources", (await text(p, "#infoT")) === "Roofing window" && /Stop: lightning/.test(await text(p, "#infoB")) && /1926\.968/.test(await text(p, "#infoB")) && /GAF, Owens Corning, ARMA/.test(await text(p, "#infoB")));
+ok("explainer says what it's built for", /which days can I book a tear-off/.test(await text(p, "#infoB")) && /HRRR/.test(await text(p, "#infoB")));
 ok("fourteen source links, all external and new-tab", (await p.locator("#infoB .src a").count()) === 14 && await p.locator("#infoB .src a").evaluateAll(as => as.every(a => /^https:\/\//.test(a.href) && a.target === "_blank" && /noopener/.test(a.rel))));
 await p.click("#infoDone"); await p.waitForTimeout(200);
-await p.click('[data-roof="6"]'); await p.waitForTimeout(200);
+await p.click('[data-sq="30"]'); await p.click('[data-crew="4"]'); await p.waitForTimeout(200);
 ok("no errors", p.errors.length === 0, p.errors.join(" | "));
 if (process.env.SHOT) await p.locator("#roof").screenshot({ path: path.join(process.env.SHOT, "weather-roof.png") });
+if (process.env.SHOT) await p.locator("#roofWeek").screenshot({ path: path.join(process.env.SHOT, "weather-week.png") });
 await p.context().close();
 
 /* ---------- 3b. the alerts screen ---------- */
@@ -371,7 +394,7 @@ apiDown = false;
 console.log("my location");
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, geolocation: { latitude: 36.7, longitude: -97.08 }, permissions: ["geolocation"], serviceWorkers: "block" });
 p = await ctx.newPage(); p.errors = []; p.on("pageerror", e => p.errors.push(String(e)));
-await p.route("**/api.open-meteo.com/**", r => r.fulfill({ json: FORECAST }));
+await p.route("**/api.open-meteo.com/**", r => r.fulfill({ json: /models=gfs_hrrr/.test(r.request().url()) ? HRRR : FORECAST }));
 await p.route("**/api.bigdatacloud.net/**", r => r.fulfill({ json: { city: "Ponca City", principalSubdivisionCode: "US-OK", countryCode: "US" } }));
 await mockExtras(p);
 await p.goto(BASE); await p.waitForTimeout(300);
