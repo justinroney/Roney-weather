@@ -11,7 +11,7 @@ version string (`wNN`), service worker.
 ```bash
 npm install --no-save --no-package-lock playwright@1.49.1   # not a repo dependency
 npx playwright install chromium
-node tests/smoke.mjs        # ~181 checks, every network source mocked, ~23s
+node tests/smoke.mjs        # ~183 checks, every network source mocked, ~23s
 # Syntax-check the inline script before any commit:
 python3 -c "import re;open('/tmp/w.js','w').write(max(re.findall(r'<script>(.*?)</script>',open('index.html').read(),re.S),key=len))" && node --check /tmp/w.js
 ```
@@ -64,10 +64,13 @@ parsed by `parseLog()` — header row optional, tabs/commas/semicolons —
 and summarised by `logStats()`; "measured pace" is the 25th percentile of
 squares per man-hour, and adopting it sets `S.roofRate`, which then shows
 as an extra chip marked "measured". `roofTimeline()` draws three days on a fixed
-5 AM–9 PM axis (`TL_FROM`/`TL_TO`): hours merged into labelled blocks,
-hatched for hours already gone, a now line, and the job as a dashed box
-from the first workable hour; blocks are buttons that open the hour
-explainer. `roofOutlook()` is the
+7 AM–7 PM axis (`TL_FROM`/`TL_TO`): hours merged into labelled blocks,
+hatched for hours already gone, a now line, sunrise and sunset marked
+(times beside the day), and the job as a dashed box from the first
+workable hour; blocks are buttons that open the hour explainer. The
+working cutoff is sunrise to sunset: `attachSun()` marks `H.lit` from the
+daily sunrise/sunset (an hour counts only when fully lit) and `lit(H, i)`
+replaces `is_day` everywhere in the roofing code. `roofOutlook()` is the
 seven-day workdays list (longest `roofWindows` run per day; "seals" = two
 of the next three days ≥ 45° with weather code ≤ 2). The suite checks
 every rule against these numbers — change a threshold in `roofRisk`, the

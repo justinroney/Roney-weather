@@ -34,8 +34,8 @@ What it does (w13):
   capacity, and a caution day is planned at about half, because crews
   won't open a roof they can't dry in the same day. Then get a
   GO / CAUTION / NO GO verdict with the reason ("Rain (HRRR) around 1 PM
-  leaves 4 dry hours; you need 5"), a three-day timeline on one 5 AM–9 PM
-  clock with labelled blocks ("dry 4 h", "rain", "dew", "dark"), a now line
+  leaves 4 dry hours; you need 5"), a three-day timeline on one 7 AM–7 PM
+  clock, cut off at each day's real sunrise and sunset, with labelled blocks ("dry 4 h", "rain", "dew", "dark"), a now line
   and your job drawn as a dashed box, and the factors: rain, **timing** (the default blend against NOAA's HRRR
   model, planning on whichever is earlier), **surface** (rain in the last
   24 hours, dew, a wet deck), **storms** (thunder, plus CAPE storm fuel),

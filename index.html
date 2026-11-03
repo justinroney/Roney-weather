@@ -213,6 +213,9 @@ svg{display:block}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg.r0,:root:not([data-theme="light"]) .seg.r1,:root:not([data-theme="light"]) .seg.r2{color:#06131B}}
 .tl .tick{position:absolute;top:0;bottom:0;width:1px;background:rgba(127,127,127,.25);pointer-events:none}
 .tlnow{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:1px;pointer-events:none;z-index:2;box-shadow:0 0 0 1.5px var(--card-solid)}
+.tl .sun{position:absolute;top:-2px;bottom:-2px;width:0;border-left:2px dotted var(--sun);pointer-events:none;z-index:1}
+.tlrow .d small{display:block;font-size:10px;color:var(--faint);font-weight:600;line-height:1.1}
+.tlkey i.sunkey{width:0;height:10px;border-left:2px dotted var(--sun);border-radius:0}
 .tljob{position:absolute;top:-3px;bottom:-3px;border:2px dashed var(--ink);border-radius:6px;pointer-events:none;z-index:1}
 .tlkey{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:var(--fs-micro);color:var(--faint);font-weight:700;margin-top:8px}
 .tlkey span{display:flex;align-items:center;gap:5px}
@@ -518,7 +521,7 @@ svg{display:block}
 <script>
 "use strict";
 /* ================= state ================= */
-const APP_VERSION = "w13 · sized for a crew";
+const APP_VERSION = "w14 · sunrise to sunset";
 const KEY = "roney-weather-v1";
 const STALE_MS = 10 * 60 * 1000;         // re-fetch when the forecast is older than this
 const FORECAST = "https://api.open-meteo.com/v1/forecast";
@@ -739,6 +742,17 @@ function sortAlerts(a) { return a.slice().sort((x, y) => TONE_RANK[x.tone] - TON
 
 /* ================= rendering ================= */
 function setSub(text) { $("hSub").textContent = text; }
+// The working cutoff is sunrise to sunset: an hour counts as lit only when it starts at
+// or after sunrise and ends by sunset, from the daily table. Falls back to is_day.
+function attachSun(d) {
+  const H = d.hourly, D = d.daily; H.lit = null; H.sun = null;
+  if (!D || !D.sunrise || !D.sunset) return;
+  const mins = iso => parseInt(iso.slice(11, 13), 10) * 60 + parseInt(iso.slice(14, 16), 10);
+  const sun = new Map(D.time.map((t, i) => [t, [mins(D.sunrise[i]), mins(D.sunset[i])]]));
+  H.sun = sun;
+  H.lit = H.time.map(t => { const s = sun.get(t.slice(0, 10)); if (!s) return null; const h = parseInt(t.slice(11, 13), 10) * 60; return h >= s[0] && h + 60 <= s[1]; });
+}
+const lit = (H, i) => H.lit && H.lit[i] != null ? H.lit[i] : !!H.is_day[i];
 // Mark hours the HRRR model calls wet, aligned by wall-clock time, onto the blend's hourly.
 function attachAlt(c) {
   const H = c.d.hourly, A = c.hrrr;
@@ -765,7 +779,7 @@ function render() {
   }
   const stale = Date.now() - c.at > STALE_MS * 6;
   setSub((stale ? "Last forecast " : "Updated ") + ago(c.at) + (navigator.onLine === false ? " · offline" : ""));
-  attachAlt(c);
+  attachSun(c.d); attachAlt(c);
   $("view").innerHTML = forecast(c, l);
   if (!$("alertsOvl").hidden) renderAlerts();
 }
@@ -1016,15 +1030,15 @@ function wetBefore(H, i) {
   return false;
 }
 function dewy(H, i) {                       // first two daylight hours with the air near saturation
-  const dp = (H.dew_point_2m || [])[i]; if (dp == null || !H.is_day[i]) return false;
-  const firstLight = !H.is_day[i - 1] || !H.is_day[i - 2];
+  const dp = (H.dew_point_2m || [])[i]; if (dp == null || !lit(H, i)) return false;
+  const firstLight = !lit(H, i - 1) || !lit(H, i - 2);
   return firstLight && H.temperature_2m[i] - dp <= 3;
 }
 function roofRisk(H, i) {                     // 0 fine · 1 caution · 2 stop · 3 dark
   const pp = (H.precipitation_probability || [])[i] ?? 0, pr = (H.precipitation || [])[i] ?? 0, code = H.weather_code[i];
   const w = (H.wind_speed_10m || [])[i] ?? 0, g = (H.wind_gusts_10m || [])[i] ?? w * 1.5, t = H.temperature_2m[i];
   const hx = (H.apparent_temperature || [])[i] ?? t;
-  if (!H.is_day[i]) return { lvl: 3, why: "dark" };
+  if (!lit(H, i)) return { lvl: 3, why: "dark" };
   if (code >= 95) return { lvl: 2, why: "thunderstorms" };
   if (pp >= 50 || pr > 0.01 || code >= 51) return { lvl: 2, why: (code >= 71 && code <= 77) || code === 85 || code === 86 ? "snow" : "rain" };
   if (H.alt_wet && H.alt_wet[i]) return { lvl: 2, why: "rain in the HRRR model" };
@@ -1124,7 +1138,7 @@ function roofSection(d, hi, need) {
     rf("Storms", Math.max(stormLvl, capeHi.m >= 1500 ? 1 : 0), storm < 0 ? (capeHi.m >= 1500 ? `no thunder forecast, but storm fuel is high ${when(capeHi.at)} (CAPE ${Math.round(capeHi.m)}) · watch the radar` : "no thunder in the forecast" + (capeHi.m >= 800 ? ` · some storm fuel ${when(capeHi.at)} (CAPE ${Math.round(capeHi.m)})` : ", little storm fuel")) : `thunder possible ${when(storm)} · off the roof, 30 min after the last rumble (OSHA/NOAA)`) +
     rf("Wind", windLvl, isFinite(wHi) ? `${U.wind(wLo).split(" ")[0]} to ${U.wind(wHi)}, gusts to ${U.wind(gHi)}` + (windLvl === 2 ? " · over OSHA's 30 mph line for material handling" : windLvl === 1 ? " · near OSHA's 30 mph line, hold sheets down" : " · under OSHA's 30 mph line") : "not reported") +
     rf("Temp", tempLvl, isFinite(tLo) ? `${deg(tLo)} to ${deg(tHi)}` + (tLo <= 32 ? " · ice on the deck" : hxHi >= 103 ? " · heat index " + deg(hxHi) + ", NWS danger band" : tLo < 40 ? " · under the 40° shingle minimum (GAF, Owens Corning)" : hxHi >= 90 ? " · heat index " + deg(hxHi) + ", 15-min breaks every 2 h (OSHA)" : hxHi >= 80 ? " · heat index " + deg(hxHi) + ", water and shade (OSHA)" : " · above the 40° shingle minimum, seals well") : "not reported") +
-    rf("Daylight", H.is_day[hi] ? 0 : 3, `sunrise ${fmtClock(D.sunrise[ti])} · sunset ${fmtClock(D.sunset[ti])}` + (H.is_day[hi] ? " · " + fmtDur(minsBetween(cur.time, D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light left" : " · no roof work without lighting (OSHA 1926.56)"));
+    rf("Daylight", lit(H, hi) ? 0 : 3, `sunrise ${fmtClock(D.sunrise[ti])} · sunset ${fmtClock(D.sunset[ti])}` + (lit(H, hi) ? " · " + fmtDur(minsBetween(cur.time, D.sunset[ti])).replace(" min", "m").replace(" h ", "h ") + " of light left" : " · the cutoff is sunrise to sunset (OSHA 1926.56 wants lighting otherwise)"));
   const sq = roofSquares(), crew = S.roofCrew || 4, nb = S.roofBuildings || 1, bsq = S.roofBldgSq || 30;
   const chips = `<span class="grp"><span class="lab">Roofs</span>${ROOF_BLDGS.map(v => `<button class="chip${v === nb ? " on" : ""}" data-bld="${v}" aria-pressed="${v === nb}">${v}</button>`).join("")}<input class="num" type="number" min="1" max="40" step="1" value="${nb}" data-num="roofBuildings" aria-label="Roofs to dry in"></span>
     <span class="grp"><span class="lab">Size</span>${ROOF_BSQ.map(v => `<button class="chip${v === bsq ? " on" : ""}" data-bsq="${v}" aria-pressed="${v === bsq}">${v} sq</button>`).join("")}<input class="num" type="number" min="5" max="400" step="1" value="${bsq}" data-num="roofBldgSq" aria-label="Squares per roof"></span>
@@ -1150,12 +1164,12 @@ function roofSection(d, hi, need) {
       return st ? `<b>Production log · ${st.n} day${st.n === 1 ? "" : "s"} · measured pace ${roundRate(st.p25)} sq/h (median ${roundRate(st.median)})</b><small>${st.totalSq} squares over ${Math.round(st.manHours)} man-hours · tap to add days or change the pace</small>`
         : `<b>Production log · none yet</b><small>Paste days from the master schedule (squares done, crew on the roof) and the pace becomes yours, not a rule of thumb</small>`; })()}</button>
   </div>
-  <div class="legend">One row per day on the same clock, 5 AM to 9 PM. The dashed box is your job laid on the timeline from the first workable hour: it has to fit inside green before red or dark. Tap any block for that hour. Rules follow OSHA, the OSHA/NOAA lightning sheet, shingle makers' 40° minimum and NIOSH fall reports; tap the verdict for the list.</div>
+  <div class="legend">One row per day on the same clock, 7 AM to 7 PM. The cutoff is sunrise to sunset, marked on each row with the times beside the day; an hour counts only if it's fully lit. The dashed box is your job laid on the timeline from the first workable hour: it has to fit inside green before red or dark. Tap any block for that hour. Rules follow OSHA, the OSHA/NOAA lightning sheet, shingle makers' 40° minimum and NIOSH fall reports; tap the verdict for the list.</div>
   ${roofOutlook(d, hi, need)}`;
 }
 // Three days on one clock: 5 AM to 9 PM, merged blocks labelled with what they are,
 // a "now" line, and the job's hours drawn as a dashed box from the first workable hour.
-const TL_FROM = 5, TL_TO = 21, TL_SPAN = TL_TO - TL_FROM;
+const TL_FROM = 7, TL_TO = 19, TL_SPAN = TL_TO - TL_FROM;
 const SHORT = { "": "dry", rain: "rain", "rain in the HRRR model": "rain (HRRR)", snow: "snow", thunderstorms: "storms", wind: "wind", freezing: "freezing", "dangerous heat": "heat",
   "the half hour after thunder": "after thunder", "a wet deck": "wet deck", dew: "dew", "storm fuel": "storm fuel", "a rain chance": "rain chance", gusts: "gusts", cold: "cold", heat: "heat", dark: "dark" };
 function roofTimeline(d, hi, need, P) {
@@ -1180,11 +1194,15 @@ function roofTimeline(d, hi, need, P) {
     }
     const blocks = segs.map(sg => {
       const name = sg.cls === "past" ? "" : sg.cls === "r3" ? (sg.why === "no data" ? "" : "dark") : SHORT[sg.why] ?? sg.why;
-      const label = sg.len >= 2 ? (sg.cls === "r0" ? `dry ${sg.len} h` : name) : "";
+      const label = sg.len >= 2 || (sg.cls === "r3" && name) ? (sg.cls === "r0" ? `dry ${sg.len} h` : name) : "";
       const t = `${fmtHour(H.time[Math.min(sg.i, H.time.length - 1)] || "T00:00")}: ${sg.cls === "past" ? "earlier today" : sg.cls === "r0" ? "fine" : name || "no data"}`;
       return `<button class="seg ${sg.cls}" style="left:${pct(sg.from)};width:${(sg.len / TL_SPAN * 100).toFixed(2)}%" ${sg.cls === "past" || (sg.cls === "r3" && sg.why === "no data") ? "" : `data-hour="${sg.i}"`} title="${esc(t)}" aria-label="${esc(t)}">${esc(label)}</button>`;
     }).join("");
-    const ticks = [6, 9, 12, 15, 18].map(h => `<i class="tick" style="left:${pct(h)}"></i>`).join("");
+    const ticks = [9, 12, 15, 18].map(h => `<i class="tick" style="left:${pct(h)}"></i>`).join("");
+    const sun = H.sun && H.sun.get(day);
+    const sunMarks = sun ? [["rise", sun[0] / 60, "sunrise " + fmtClock(H.time[from].slice(0, 11) + String(Math.floor(sun[0] / 60)).padStart(2, "0") + ":" + String(sun[0] % 60).padStart(2, "0"))], ["set", sun[1] / 60, "sunset " + fmtClock(H.time[from].slice(0, 11) + String(Math.floor(sun[1] / 60)).padStart(2, "0") + ":" + String(sun[1] % 60).padStart(2, "0"))]]
+      .filter(([, h]) => h >= TL_FROM && h <= TL_TO).map(([k, h, t]) => `<i class="sun ${k}" style="left:${pct(h)}" title="${esc(t)}"></i>`).join("") : "";
+    const sunLabel = sun ? `<small>${esc(fmtClock("0000-00-00T" + String(Math.floor(sun[0] / 60)).padStart(2, "0") + ":" + String(sun[0] % 60).padStart(2, "0")).replace(" AM", "").replace(" PM", ""))}–${esc(fmtClock("0000-00-00T" + String(Math.floor(sun[1] / 60)).padStart(2, "0") + ":" + String(sun[1] % 60).padStart(2, "0")).replace(" PM", "").replace(" AM", ""))}</small>` : "";
     const nowLine = k === 0 && nowH >= TL_FROM && nowH <= TL_TO ? `<i class="tlnow" style="left:${pct(nowH)}"></i>` : "";
     let job = "";
     if (jobStart >= 0 && H.time[jobStart].slice(0, 10) === day) {
@@ -1192,12 +1210,12 @@ function roofTimeline(d, hi, need, P) {
       const eh = Math.min(TL_TO, sh + need);
       if (eh > sh) job = `<i class="tljob" id="roofJob" style="left:${pct(sh)};width:${((eh - sh) / TL_SPAN * 100).toFixed(2)}%" title="your ${need} h job"></i>`;
     }
-    rows += `<div class="tlrow"><span class="d">${esc(fmtDay(day, today))}</span><div class="tl" data-day-row="${k}">${blocks}${ticks}${nowLine}${job}</div></div>`;
+    rows += `<div class="tlrow"><span class="d">${esc(fmtDay(day, today))}${sunLabel}</span><div class="tl" data-day-row="${k}">${blocks}${ticks}${sunMarks}${nowLine}${job}</div></div>`;
   }
-  const axis = [[6, "6 AM"], [9, "9"], [12, "Noon"], [15, "3"], [18, "6 PM"]].map(([h, t]) => `<span style="left:${pct(h)}">${t}</span>`).join("") +
+  const axis = [[7, "7 AM"], [9, "9"], [12, "Noon"], [15, "3"], [18, "6"], [19, "7 PM"]].map(([h, t]) => `<span style="left:${pct(h)}">${t}</span>`).join("") +
     (nowH >= TL_FROM && nowH <= TL_TO ? `<span class="now" style="left:${pct(nowH)}">now</span>` : "");
   return `<div class="tlwrap" id="roofTl"><div class="tlticks"><span></span><div class="ax">${axis}</div></div>${rows}
-    <div class="tlkey"><span><i class="r0"></i>deck can be open</span><span><i class="r1"></i>care</span><span><i class="r2"></i>stop</span><span><i class="r3"></i>dark</span><span><i class="job"></i>your ${need} h job</span></div></div>`;
+    <div class="tlkey"><span><i class="r0"></i>deck can be open</span><span><i class="r1"></i>care</span><span><i class="r2"></i>stop</span><span><i class="r3"></i>dark</span><span><i class="sunkey"></i>sunrise · sunset</span><span><i class="job"></i>your ${need} h job</span></div></div>`;
 }
 
 // Seven days of "can I book a tear-off?": the longest safe window each day, when the
@@ -1213,7 +1231,7 @@ function roofOutlook(d, hi, need) {
     if (k === ti) from = Math.max(from, hi);
     const wins = roofWindows(H, from, to);
     const best = wins.slice().sort((a, b) => b.len - a.len)[0] || null;
-    const daylight = (() => { let n = 0; for (let i = from; i < to; i++) if (H.is_day[i]) n++; return n; })();
+    const daylight = (() => { let n = 0; for (let i = from; i < to; i++) if (lit(H, i)) n++; return n; })();
     let verdict, text, sub;
     if (!best || best.len === 0) {
       verdict = "nogo";
@@ -1229,7 +1247,7 @@ function roofOutlook(d, hi, need) {
       sub = (margin < 0 ? `${-margin} h short for the job` : margin < 2 ? "fits, no margin" : "fits with room") + " · ends with " + stop + (cautions.length ? " · " + cautions.join(", ") : "")
         + ` · ${S.roofCrew || 4} men ≈ ${Math.round(cap.sq)} sq, ${cap.bldgs >= 1 ? (cap.bldgs >= 2 ? Math.floor(cap.bldgs) + " roofs" : "1 roof") : "under a roof"}${best.caution ? " (half day)" : ""}`;
     }
-    let gust = 0; for (let i = from; i < to; i++) if (H.is_day[i]) gust = Math.max(gust, (H.wind_gusts_10m || [])[i] ?? 0);
+    let gust = 0; for (let i = from; i < to; i++) if (lit(H, i)) gust = Math.max(gust, (H.wind_gusts_10m || [])[i] ?? 0);
     // Seal-down: two of the next three days at ≥ 45° with sun lets the sealant bond.
     let sunny = 0; for (let j = k + 1; j <= Math.min(k + 3, D.time.length - 1); j++) if (D.temperature_2m_max[j] >= 45 && D.weather_code[j] <= 2) sunny++;
     const seal = k + 1 >= D.time.length ? "" : sunny >= 2 ? `<span class="seal">seals</span>` : `<span class="seal hand">hand-seal</span>`;
